@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../home/pagina_principal.dart';
 import '../../services/firebase_service.dart';
 import '../../utils/message_utils.dart';
+import '../../utils/auth_error_utils.dart';
+import '../../utils/password_validator.dart';
 
 class TelaLogin extends StatefulWidget {
   const TelaLogin({super.key});
@@ -14,10 +17,13 @@ class _TelaLoginState extends State<TelaLogin> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _senhaController = TextEditingController();
+  final _nomeController = TextEditingController();
   late final FirebaseService _firebaseServico;
   bool _senhaVisivel = false;
   bool _isLoading = false;
   bool _isRegistro = false;
+  bool _lembrarMe = false;
+  PasswordValidationResult? _passwordValidation;
 
   @override
   void initState() {
@@ -29,6 +35,7 @@ class _TelaLoginState extends State<TelaLogin> {
   void dispose() {
     _emailController.dispose();
     _senhaController.dispose();
+    _nomeController.dispose();
     super.dispose();
   }
 
@@ -42,26 +49,37 @@ class _TelaLoginState extends State<TelaLogin> {
         final email = _emailController.text.trim();
         final senha = _senhaController.text.trim();
 
-        final sucesso = await _firebaseServico.fazerLogin(email, senha);
+        final userCredential = await _firebaseServico.fazerLogin(email, senha);
 
-        if (sucesso) {
+        if (userCredential != null) {
+          // Configurar "Lembrar-me" se selecionado
+          if (_lembrarMe) {
+            await _firebaseServico.configurarLembrarMe(true);
+          }
+
+          // Atualizar última atividade
+          await _firebaseServico.atualizarUltimaAtividade();
+
           MessageUtils.mostrarSucesso(context, 'Login realizado com sucesso!');
 
-          // Navegar para a próxima tela
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => TelaInicio()),
-            );
+          // Verificar se o email está verificado
+          if (!userCredential.user!.emailVerified) {
+            _mostrarDialogoVerificacaoEmail();
+          } else {
+            // Navegar para a próxima tela
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => TelaInicio()),
+              );
+            }
           }
-        } else {
-          MessageUtils.mostrarErro(context, 'Email ou senha incorretos!');
         }
+      } on FirebaseAuthException catch (e) {
+        final errorMessage = AuthErrorUtils.getErrorMessage(e);
+        MessageUtils.mostrarErro(context, errorMessage);
       } catch (e) {
-        MessageUtils.mostrarErro(
-          context,
-          'Erro ao fazer login: ${e.toString()}',
-        );
+        MessageUtils.mostrarErro(context, 'Erro inesperado: ${e.toString()}');
       } finally {
         if (mounted) {
           setState(() {
@@ -81,31 +99,29 @@ class _TelaLoginState extends State<TelaLogin> {
       try {
         final email = _emailController.text.trim();
         final senha = _senhaController.text.trim();
-        final nome = email.split('@')[0]; // Usar parte do email como nome
+        final nome = _nomeController.text.trim().isEmpty
+            ? email.split('@')[0]
+            : _nomeController.text.trim();
 
-        print('Tentando registrar usuário: $email');
-        final sucesso = await _firebaseServico.registrarUsuario(
+        final userCredential = await _firebaseServico.registrarUsuario(
           email,
           senha,
           nome,
         );
 
-        if (sucesso) {
-          print('Usuário registrado com sucesso');
-          MessageUtils.mostrarSucesso(context, 'Conta criada com sucesso!');
+        if (userCredential != null) {
+          MessageUtils.mostrarSucesso(
+            context,
+            'Conta criada com sucesso! Verifique seu email para ativar a conta.',
+          );
 
-          // Navegar para a próxima tela
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => TelaInicio()),
-            );
-          }
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao criar conta!');
+          // Mostrar diálogo de verificação de email
+          _mostrarDialogoVerificacaoEmail();
         }
+      } on FirebaseAuthException catch (e) {
+        final errorMessage = AuthErrorUtils.getErrorMessage(e);
+        MessageUtils.mostrarErro(context, errorMessage);
       } catch (e) {
-        print('Erro no registro: $e');
         MessageUtils.mostrarErro(
           context,
           'Erro ao criar conta: ${e.toString()}',
@@ -155,6 +171,149 @@ class _TelaLoginState extends State<TelaLogin> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  void _mostrarDialogoVerificacaoEmail() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Verificação de Email'),
+          content: const Text(
+            'Enviamos um email de verificação para sua conta. '
+            'Por favor, verifique sua caixa de entrada e clique no link para ativar sua conta.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                try {
+                  await _firebaseServico.reenviarVerificacaoEmail();
+                  MessageUtils.mostrarSucesso(
+                    context,
+                    'Email de verificação reenviado!',
+                  );
+                } catch (e) {
+                  MessageUtils.mostrarErro(
+                    context,
+                    'Erro ao reenviar email: ${e.toString()}',
+                  );
+                }
+              },
+              child: const Text('Reenviar Email'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navegar para a tela principal mesmo sem verificação
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => TelaInicio()),
+                );
+              },
+              child: const Text('Continuar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _mostrarDialogoRecuperarSenha() {
+    final emailController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Recuperar Senha'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Digite seu email para receber instruções de recuperação de senha.',
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await _firebaseServico.recuperarSenha(
+                    emailController.text.trim(),
+                  );
+                  MessageUtils.mostrarSucesso(
+                    context,
+                    'Email de recuperação enviado! Verifique sua caixa de entrada.',
+                  );
+                  Navigator.of(context).pop();
+                } on FirebaseAuthException catch (e) {
+                  final errorMessage = AuthErrorUtils.getErrorMessage(e);
+                  MessageUtils.mostrarErro(context, errorMessage);
+                } catch (e) {
+                  MessageUtils.mostrarErro(
+                    context,
+                    'Erro ao enviar email: ${e.toString()}',
+                  );
+                }
+              },
+              child: const Text('Enviar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _validarSenha(String senha) {
+    if (_isRegistro && senha.isNotEmpty) {
+      setState(() {
+        _passwordValidation = PasswordValidator.validatePassword(senha);
+      });
+    }
+  }
+
+  Color _getPasswordStrengthColor() {
+    if (_passwordValidation == null) return Colors.grey;
+
+    switch (_passwordValidation!.strength) {
+      case PasswordStrength.weak:
+        return Colors.red;
+      case PasswordStrength.medium:
+        return Colors.orange;
+      case PasswordStrength.strong:
+        return Colors.blue;
+      case PasswordStrength.veryStrong:
+        return Colors.green;
+    }
+  }
+
+  IconData _getPasswordStrengthIcon() {
+    if (_passwordValidation == null) return Icons.help_outline;
+
+    switch (_passwordValidation!.strength) {
+      case PasswordStrength.weak:
+        return Icons.warning;
+      case PasswordStrength.medium:
+        return Icons.info;
+      case PasswordStrength.strong:
+        return Icons.check_circle_outline;
+      case PasswordStrength.veryStrong:
+        return Icons.verified;
     }
   }
 
@@ -241,6 +400,49 @@ class _TelaLoginState extends State<TelaLogin> {
 
                         SizedBox(height: isMobile ? 40.0 : 50.0),
 
+                        // Campo Nome (apenas no registro)
+                        if (_isRegistro) ...[
+                          Container(
+                            width: fieldWidth,
+                            height: fieldHeight,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(40),
+                              border: Border.all(
+                                color: const Color(0xFF020101),
+                                width: 1,
+                              ),
+                            ),
+                            child: TextFormField(
+                              controller: _nomeController,
+                              style: TextStyle(
+                                fontSize: isMobile ? 16.0 : 18.0,
+                                color: const Color(0xFF333333),
+                              ),
+                              decoration: InputDecoration(
+                                hintText: "Nome completo",
+                                hintStyle: TextStyle(
+                                  fontSize: isMobile ? 16.0 : 18.0,
+                                  color: const Color.fromRGBO(0, 0, 0, 0.49),
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                              ),
+                              validator: (value) {
+                                if (_isRegistro &&
+                                    (value == null || value.isEmpty)) {
+                                  return 'Por favor, digite seu nome';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          SizedBox(height: isMobile ? 20.0 : 25.0),
+                        ],
+
                         // Campo Email
                         Container(
                           width: fieldWidth,
@@ -301,6 +503,7 @@ class _TelaLoginState extends State<TelaLogin> {
                           child: TextFormField(
                             controller: _senhaController,
                             obscureText: !_senhaVisivel,
+                            onChanged: _validarSenha,
                             style: TextStyle(
                               fontSize: isMobile ? 16.0 : 18.0,
                               color: const Color(0xFF333333),
@@ -334,15 +537,111 @@ class _TelaLoginState extends State<TelaLogin> {
                               if (value == null || value.isEmpty) {
                                 return 'Por favor, digite sua senha';
                               }
-                              if (value.length < 6) {
-                                return 'A senha deve ter pelo menos 6 caracteres';
+                              if (_isRegistro) {
+                                if (_passwordValidation != null &&
+                                    !_passwordValidation!.isValid) {
+                                  return _passwordValidation!.errors.first;
+                                }
+                              } else {
+                                if (value.length < 6) {
+                                  return 'A senha deve ter pelo menos 6 caracteres';
+                                }
                               }
                               return null;
                             },
                           ),
                         ),
 
-                        SizedBox(height: isMobile ? 30.0 : 40.0),
+                        // Indicador de força da senha (apenas no registro)
+                        if (_isRegistro && _passwordValidation != null) ...[
+                          SizedBox(height: isMobile ? 10.0 : 15.0),
+                          Container(
+                            width: fieldWidth,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _getPasswordStrengthColor().withOpacity(
+                                0.1,
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _getPasswordStrengthColor(),
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _getPasswordStrengthIcon(),
+                                      color: _getPasswordStrengthColor(),
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Força da senha: ${_passwordValidation!.strengthText}',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 12.0 : 14.0,
+                                        color: _getPasswordStrengthColor(),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_passwordValidation!.errors.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  ..._passwordValidation!.errors.map(
+                                    (error) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Text(
+                                        '• $error',
+                                        style: TextStyle(
+                                          fontSize: isMobile ? 11.0 : 12.0,
+                                          color: Colors.red[600],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        SizedBox(height: isMobile ? 20.0 : 25.0),
+
+                        // Checkbox "Lembrar-me" (apenas no login)
+                        if (!_isRegistro) ...[
+                          Container(
+                            width: fieldWidth,
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  value: _lembrarMe,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _lembrarMe = value ?? false;
+                                    });
+                                  },
+                                  activeColor: const Color(0xFF541822),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    'Lembrar-me por 30 dias',
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 14.0 : 16.0,
+                                      color: const Color(0xFF333333),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(height: isMobile ? 20.0 : 25.0),
+                        ],
+
+                        SizedBox(height: isMobile ? 10.0 : 15.0),
 
                         // Botão Entrar
                         GestureDetector(
@@ -384,6 +683,22 @@ class _TelaLoginState extends State<TelaLogin> {
                         ),
 
                         SizedBox(height: isMobile ? 20.0 : 25.0),
+
+                        // Link para recuperar senha (apenas no login)
+                        if (!_isRegistro) ...[
+                          GestureDetector(
+                            onTap: _mostrarDialogoRecuperarSenha,
+                            child: Text(
+                              "Esqueceu sua senha?",
+                              style: TextStyle(
+                                fontSize: isMobile ? 14.0 : 16.0,
+                                color: const Color(0xFF541822),
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: isMobile ? 20.0 : 25.0),
+                        ],
 
                         // Divisor
                         Row(

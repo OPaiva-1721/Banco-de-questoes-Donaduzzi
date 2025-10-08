@@ -42,10 +42,8 @@ lib/
 │   │   └── tela_login.dart
 │   ├── home/                   # Página principal
 │   │   └── pagina_principal.dart
-│   └── admin/                  # Funcionalidades admin (estrutura)
-│       ├── tela_disciplinas.dart
-│       ├── tela_exames.dart
-│       └── tela_questoes.dart
+│   ├── coordinator/            # Funcionalidades de coordenador
+│   └── professor/              # Funcionalidades de professor
 └── widgets/                     # Componentes reutilizáveis
 ```
 
@@ -54,7 +52,7 @@ lib/
 - **Flutter:** Framework principal
 - **Firebase:** Autenticação e banco de dados
   - Firebase Auth
-  - Cloud Firestore
+  - Realtime Database
   - Google Sign-In
 - **Dart:** Linguagem de programação
 
@@ -63,9 +61,9 @@ lib/
 ```yaml
 dependencies:
   flutter: sdk
-  firebase_core: ^2.24.2
-  cloud_firestore: ^4.13.6
-  firebase_auth: ^4.15.3
+  firebase_core: ^3.15.2
+  firebase_database: ^11.0.2
+  firebase_auth: ^5.3.1
   google_sign_in: ^6.2.1
 ```
 
@@ -115,7 +113,7 @@ O projeto está configurado para usar Firebase. Certifique-se de:
 3. **Baixar arquivos de configuração:**
    - `google-services.json` para Android
    - `GoogleService-Info.plist` para iOS
-4. **Habilitar Authentication e Firestore**
+4. **Habilitar Authentication e Realtime Database**
 
 ## 📋 **Próximos Passos para o Grupo**
 
@@ -140,10 +138,11 @@ O projeto está configurado para usar Firebase. Certifique-se de:
    - Animações
 
 ### **Estrutura Pronta para Expansão:**
-- ✅ Telas base criadas em `screens/admin/`
+- ✅ Telas base criadas em `screens/coordinator/` e `screens/professor/`
 - ✅ Sistema de mensagens centralizado
 - ✅ Cores e constantes organizadas
 - ✅ Estrutura de serviços preparada
+- ✅ Sistema de permissões simplificado (professor e coordenador)
 
 ## 🐛 **Resolução de Problemas**
 

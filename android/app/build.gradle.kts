@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.prova.donaduzzi"
+    namespace = "com.exemplo.prova"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.prova.donaduzzi"
+        applicationId = "com.exemplo.prova"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -42,4 +42,14 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
+    
+    // Add the dependencies for Firebase products you want to use
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-database")
 }
