@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../utils/message_utils.dart';
 import '../../services/firebase_service.dart';
 import '../auth/tela_login.dart';
+import '../professor/criar_prova/criar_prova_screen.dart';
+import '../professor/banco_questoes/banco_questoes_menu_screen.dart';
+import '../professor/provas_geradas_screen.dart';
 
 class TelaInicio extends StatelessWidget {
   const TelaInicio({super.key});
@@ -16,11 +19,6 @@ class TelaInicio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Mostrar diretamente o dashboard de professor para todos os usuários
-    return _buildProfessorDashboard(context);
-  }
-
-  Widget _buildProfessorDashboard(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final isMobile = screenSize.width < 768;
     final isTablet = screenSize.width >= 768 && screenSize.width < 1024;
@@ -59,7 +57,7 @@ class TelaInicio extends StatelessWidget {
 
   // Header responsivo
   Widget _buildHeader(BuildContext context, bool isMobile, bool isTablet) {
-    final headerHeight = isMobile ? 80.0 : (isTablet ? 90.0 : 100.0);
+    final headerHeight = isMobile ? 100.0 : (isTablet ? 110.0 : 120.0);
     final logoSize = isMobile ? 140.0 : (isTablet ? 150.0 : 160.0);
     final logoHeight = isMobile ? 50.0 : (isTablet ? 55.0 : 60.0);
 
@@ -119,7 +117,7 @@ class TelaInicio extends StatelessWidget {
                 icon: const Icon(Icons.logout, color: Colors.white, size: 28),
                 tooltip: 'Sair',
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.white.withOpacity(0.1),
+                  backgroundColor: _primaryColor,
                   shape: const CircleBorder(),
                 ),
               ),
@@ -268,15 +266,24 @@ class TelaInicio extends StatelessWidget {
   }
 
   void _navegarParaCriarProva(BuildContext context) {
-    MessageUtils.mostrarToast(context, 'Navegando para "Criar nova prova"...');
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CriarProvaScreen()),
+    );
   }
 
   void _navegarParaBancoQuestoes(BuildContext context) {
-    MessageUtils.mostrarToast(context, 'Navegando para "Banco de questões"...');
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const BancoQuestoesMenuScreen()),
+    );
   }
 
   void _navegarParaProvasGeradas(BuildContext context) {
-    MessageUtils.mostrarToast(context, 'Navegando para "Provas geradas"...');
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
+    );
   }
 
   // Método para fazer logout
