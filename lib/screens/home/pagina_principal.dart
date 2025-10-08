@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../utils/message_utils.dart';
+import '../../services/firebase_service.dart';
+import '../auth/tela_login.dart';
 
 class TelaInicio extends StatelessWidget {
   const TelaInicio({super.key});
+
+  static final FirebaseService _firebaseService = FirebaseService();
 
   // Sistema de temas
   static const Color _primaryColor = Color(0xFF541822);
@@ -12,6 +16,11 @@ class TelaInicio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mostrar diretamente o dashboard de professor para todos os usuários
+    return _buildProfessorDashboard(context);
+  }
+
+  Widget _buildProfessorDashboard(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final isMobile = screenSize.width < 768;
     final isTablet = screenSize.width >= 768 && screenSize.width < 1024;
@@ -68,33 +77,55 @@ class TelaInicio extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: Image.asset(
-          'assets/images/logo.png',
-          width: logoSize,
-          height: logoHeight,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
+      child: Stack(
+        children: [
+          // Logo centralizado
+          Center(
+            child: Image.asset(
+              'assets/images/logo.png',
               width: logoSize,
               height: logoHeight,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  'LOGO',
-                  style: TextStyle(
-                    fontSize: isMobile ? 16 : 18,
-                    fontWeight: FontWeight.bold,
-                    color: _primaryColor,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: logoSize,
+                  height: logoHeight,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  child: Center(
+                    child: Text(
+                      'LOGO',
+                      style: TextStyle(
+                        fontSize: isMobile ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                        color: _primaryColor,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Botão de logout no canto direito
+          Positioned(
+            right: 16,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: IconButton(
+                onPressed: () => _fazerLogout(context),
+                icon: const Icon(Icons.logout, color: Colors.white, size: 28),
+                tooltip: 'Sair',
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.1),
+                  shape: const CircleBorder(),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -236,23 +267,33 @@ class TelaInicio extends StatelessWidget {
     );
   }
 
-  // Navegação para funcionalidades (implementação real)
   void _navegarParaCriarProva(BuildContext context) {
     MessageUtils.mostrarToast(context, 'Navegando para "Criar nova prova"...');
-    // TODO: Implementar navegação real
-    // Navigator.push(context, MaterialPageRoute(builder: (context) => TelaCriarProva()));
   }
 
   void _navegarParaBancoQuestoes(BuildContext context) {
     MessageUtils.mostrarToast(context, 'Navegando para "Banco de questões"...');
-    // TODO: Implementar navegação real
-    // Navigator.push(context, MaterialPageRoute(builder: (context) => TelaBancoQuestoes()));
   }
 
   void _navegarParaProvasGeradas(BuildContext context) {
     MessageUtils.mostrarToast(context, 'Navegando para "Provas geradas"...');
-    // TODO: Implementar navegação real
-    // Navigator.push(context, MaterialPageRoute(builder: (context) => TelaProvasGeradas()));
+  }
+
+  // Método para fazer logout
+  Future<void> _fazerLogout(BuildContext context) async {
+    try {
+      await _firebaseService.fazerLogout();
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const TelaLogin()),
+        (route) => false,
+      );
+    } catch (e) {
+      MessageUtils.mostrarErro(
+        context,
+        'Erro ao fazer logout: ${e.toString()}',
+      );
+    }
   }
 }
 

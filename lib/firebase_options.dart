@@ -41,46 +41,61 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAgtkzsrlaRGdhOwFFSSvB4FRcAmFz1_LA',
-    appId: '1:784822751901:web:be5ff49a5f033a1da5fa74',
-    messagingSenderId: '784822751901',
-    projectId: 'prova-5b69a',
-    authDomain: 'prova-5b69a.firebaseapp.com',
-    storageBucket: 'prova-5b69a.firebasestorage.app',
+    apiKey: 'AIzaSyA60rpcjwU7Suzwjo1BI3SDEKa0O87kaH0',
+    appId: '1:526891742329:web:86e16eefece6b4b1df10a8',
+    messagingSenderId: '526891742329',
+    projectId: 'banco-de-questoes-cdc6b',
+    authDomain: 'banco-de-questoes-cdc6b.firebaseapp.com',
+    databaseURL: 'https://banco-de-questoes-cdc6b-default-rtdb.firebaseio.com',
+    storageBucket: 'banco-de-questoes-cdc6b.firebasestorage.app',
+    measurementId: 'G-CXG0D2F7SG',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAgtkzsrlaRGdhOwFFSSvB4FRcAmFz1_LA',
-    appId: '1:784822751901:android:be5ff49a5f033a1da5fa74',
-    messagingSenderId: '784822751901',
-    projectId: 'prova-5b69a',
-    storageBucket: 'prova-5b69a.firebasestorage.app',
+    apiKey: 'AIzaSyA60rpcjwU7Suzwjo1BI3SDEKa0O87kaH0',
+    appId: '1:526891742329:android:86e16eefece6b4b1df10a8',
+    messagingSenderId: '526891742329',
+    projectId: 'banco-de-questoes-cdc6b',
+    databaseURL: 'https://banco-de-questoes-cdc6b-default-rtdb.firebaseio.com',
+    storageBucket: 'banco-de-questoes-cdc6b.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAgtkzsrlaRGdhOwFFSSvB4FRcAmFz1_LA',
-    appId: '1:784822751901:ios:be5ff49a5f033a1da5fa74',
-    messagingSenderId: '784822751901',
-    projectId: 'prova-5b69a',
-    storageBucket: 'prova-5b69a.firebasestorage.app',
-    iosBundleId: 'com.prova.donaduzzi',
+    apiKey: 'AIzaSyA60rpcjwU7Suzwjo1BI3SDEKa0O87kaH0',
+    appId: '1:526891742329:ios:86e16eefece6b4b1df10a8',
+    messagingSenderId: '526891742329',
+    projectId: 'banco-de-questoes-cdc6b',
+    databaseURL: 'https://banco-de-questoes-cdc6b-default-rtdb.firebaseio.com',
+    storageBucket: 'banco-de-questoes-cdc6b.firebasestorage.app',
+    androidClientId:
+        '526891742329-moo832g7enr7m5vnjau9ec4f0kdaarcg.apps.googleusercontent.com',
+    iosClientId:
+        '526891742329-ismost5v0dctrh80be6tp6lturti1109.apps.googleusercontent.com',
+    iosBundleId: 'com.exemplo.prova',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAgtkzsrlaRGdhOwFFSSvB4FRcAmFz1_LA',
-    appId: '1:784822751901:ios:be5ff49a5f033a1da5fa74',
-    messagingSenderId: '784822751901',
-    projectId: 'prova-5b69a',
-    storageBucket: 'prova-5b69a.firebasestorage.app',
-    iosBundleId: 'com.prova.donaduzzi',
+    apiKey: 'AIzaSyA60rpcjwU7Suzwjo1BI3SDEKa0O87kaH0',
+    appId: '1:526891742329:ios:86e16eefece6b4b1df10a8',
+    messagingSenderId: '526891742329',
+    projectId: 'banco-de-questoes-cdc6b',
+    databaseURL: 'https://banco-de-questoes-cdc6b-default-rtdb.firebaseio.com',
+    storageBucket: 'banco-de-questoes-cdc6b.firebasestorage.app',
+    androidClientId:
+        '526891742329-moo832g7enr7m5vnjau9ec4f0kdaarcg.apps.googleusercontent.com',
+    iosClientId:
+        '526891742329-ismost5v0dctrh80be6tp6lturti1109.apps.googleusercontent.com',
+    iosBundleId: 'com.exemplo.prova',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyAgtkzsrlaRGdhOwFFSSvB4FRcAmFz1_LA',
-    appId: '1:784822751901:web:be5ff49a5f033a1da5fa74',
-    messagingSenderId: '784822751901',
-    projectId: 'prova-5b69a',
-    authDomain: 'prova-5b69a.firebaseapp.com',
-    storageBucket: 'prova-5b69a.firebasestorage.app',
+    apiKey: 'AIzaSyA60rpcjwU7Suzwjo1BI3SDEKa0O87kaH0',
+    appId: '1:526891742329:web:86e16eefece6b4b1df10a8',
+    messagingSenderId: '526891742329',
+    projectId: 'banco-de-questoes-cdc6b',
+    authDomain: 'banco-de-questoes-cdc6b.firebaseapp.com',
+    databaseURL: 'https://banco-de-questoes-cdc6b-default-rtdb.firebaseio.com',
+    storageBucket: 'banco-de-questoes-cdc6b.firebasestorage.app',
+    measurementId: 'G-CXG0D2F7SG',
   );
 }
