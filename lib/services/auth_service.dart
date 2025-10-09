@@ -53,7 +53,6 @@ class AuthService {
       // Sanitizar dados antes de salvar
       final nomeSanitizado = _securityService.sanitizarEntrada(nome);
       final emailSanitizado = _securityService.sanitizarEntrada(email);
-
       // Salvar dados adicionais no Realtime Database
       final userRef = _database.ref('usuarios/${userCredential.user!.uid}');
       await userRef.set({
