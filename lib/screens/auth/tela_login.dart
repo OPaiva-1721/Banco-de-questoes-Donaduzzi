@@ -613,7 +613,7 @@ class _TelaLoginState extends State<TelaLogin> {
 
                         // Checkbox "Lembrar-me" (apenas no login)
                         if (!_isRegistro) ...[
-                          Container(
+                          SizedBox(
                             width: fieldWidth,
                             child: Row(
                               children: [

@@ -11,13 +11,17 @@ class DisciplineService {
   // ========== MÉTODOS DE DISCIPLINA ==========
 
   /// Cria uma nova disciplina
-  Future<String?> criarDisciplina(String nome, int semestre) async {
+  Future<String?> criarDisciplina(
+    String nome,
+    int semestre, {
+    String? cursoId,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) return null;
 
     try {
       // Validar entrada
-      if (!_securityService.validarEntrada(nome, maxLength: 100)) {
+      if (!_securityService.validarTexto(nome, maxLength: 100)) {
         throw Exception('Nome da disciplina inválido');
       }
 
@@ -27,7 +31,7 @@ class DisciplineService {
 
       final nomeSanitizado = _securityService.sanitizarEntrada(nome);
       final disciplinaId =
-          '${nomeSanitizado.toLowerCase().replaceAll(' ', '_')}_${semestre}';
+          '${nomeSanitizado.toLowerCase().replaceAll(' ', '_')}_$semestre';
 
       // Verificar se já existe uma disciplina com esse ID
       final snapshot = await _database.ref('disciplinas/$disciplinaId').get();
@@ -39,6 +43,7 @@ class DisciplineService {
       await disciplinaRef.set({
         'nome': nomeSanitizado,
         'semestre': semestre,
+        'cursoId': cursoId,
         'dataCriacao': ServerValue.timestamp,
         'criadoPor': user.uid,
         'status': 'ativo',
@@ -79,6 +84,15 @@ class DisciplineService {
         .onValue;
   }
 
+  /// Busca disciplinas por curso
+  Stream<DatabaseEvent> buscarDisciplinasPorCurso(String cursoId) {
+    return _database
+        .ref('disciplinas')
+        .orderByChild('cursoId')
+        .equalTo(cursoId)
+        .onValue;
+  }
+
   /// Busca uma disciplina específica
   Future<DataSnapshot?> buscarDisciplina(String disciplinaId) async {
     try {
@@ -95,11 +109,22 @@ class DisciplineService {
     Map<String, dynamic> dados,
   ) async {
     try {
-      // Sanitizar dados se necessário
+      // Validar dados se necessário
       if (dados.containsKey('nome')) {
+        if (!_securityService.validarTexto(dados['nome'], maxLength: 100)) {
+          throw Exception('Nome da disciplina inválido');
+        }
         dados['nome'] = _securityService.sanitizarEntrada(dados['nome']);
       }
-      if (dados.containsKey('descricao')) {
+      if (dados.containsKey('descricao') &&
+          dados['descricao'] != null &&
+          dados['descricao'].toString().trim().isNotEmpty) {
+        if (!_securityService.validarTexto(
+          dados['descricao'],
+          maxLength: 500,
+        )) {
+          throw Exception('Descrição da disciplina inválida');
+        }
         dados['descricao'] = _securityService.sanitizarEntrada(
           dados['descricao'],
         );

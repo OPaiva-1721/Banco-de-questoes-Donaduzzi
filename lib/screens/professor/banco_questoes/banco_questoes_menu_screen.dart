@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../services/question_service.dart';
+import '../../../services/discipline_service.dart';
+import '../../../utils/message_utils.dart';
 import 'adicionar_questao_screen.dart';
 import 'editar_questao_screen.dart';
 
@@ -17,36 +20,134 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
   static const Color _textColor = Color(0xFF333333);
   static const Color _whiteColor = Colors.white;
 
-  // Lista de questões de exemplo (em produção, isso viria do Firebase)
-  final List<Map<String, dynamic>> _questoes = [
-    {
-      'id': '1',
-      'enunciado':
-          'Qual é a complexidade temporal do algoritmo de ordenação QuickSort no pior caso?',
-      'curso': 'Ciência da Computação',
-      'materia': 'Algoritmos',
-      'dificuldade': 'Médio',
-      'dataCriacao': '2024-01-15',
-    },
-    {
-      'id': '2',
-      'enunciado':
-          'Explique o conceito de herança em programação orientada a objetos.',
-      'curso': 'Engenharia de Software',
-      'materia': 'Programação',
-      'dificuldade': 'Fácil',
-      'dataCriacao': '2024-01-14',
-    },
-    {
-      'id': '3',
-      'enunciado':
-          'Como funciona o protocolo TCP/IP e qual sua diferença do UDP?',
-      'curso': 'Sistemas de Informação',
-      'materia': 'Redes',
-      'dificuldade': 'Difícil',
-      'dataCriacao': '2024-01-13',
-    },
-  ];
+  // Serviços
+  final QuestionService _questionService = QuestionService();
+  final DisciplineService _disciplineService = DisciplineService();
+
+  // Estados
+  List<Map<String, dynamic>> _questoes = [];
+  List<Map<String, dynamic>> _disciplinas = [];
+  bool _isLoading = true;
+  String? _disciplinaFiltro;
+  String _dificuldadeFiltro = 'todas';
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarDados();
+  }
+
+  /// Carrega questões e disciplinas do Firebase
+  Future<void> _carregarDados() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Carregar disciplinas e questões em paralelo
+      await Future.wait([_carregarDisciplinas(), _carregarQuestoes()]);
+    } catch (e) {
+      print('Erro ao carregar dados: $e');
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// Carrega disciplinas do Firebase
+  Future<void> _carregarDisciplinas() async {
+    try {
+      final stream = _disciplineService.listarDisciplinas();
+      final event = await stream.first;
+
+      if (event.snapshot.exists) {
+        final disciplinas = <Map<String, dynamic>>[];
+        for (final child in event.snapshot.children) {
+          final disciplina = {
+            'id': child.key,
+            ...Map<String, dynamic>.from(child.value as Map),
+          };
+          disciplinas.add(disciplina);
+        }
+        if (mounted) {
+          setState(() {
+            _disciplinas = disciplinas;
+          });
+        }
+      }
+    } catch (e) {
+      print('Erro ao carregar disciplinas: $e');
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
+      }
+    }
+  }
+
+  /// Carrega questões do Firebase
+  Future<void> _carregarQuestoes() async {
+    try {
+      final stream = _questionService.listarQuestoes();
+      final event = await stream.first;
+
+      if (event.snapshot.exists) {
+        final questoes = <Map<String, dynamic>>[];
+        for (final child in event.snapshot.children) {
+          final questao = {
+            'id': child.key,
+            ...Map<String, dynamic>.from(child.value as Map),
+          };
+          questoes.add(questao);
+        }
+        if (mounted) {
+          setState(() {
+            _questoes = questoes;
+          });
+        }
+      }
+    } catch (e) {
+      print('Erro ao carregar questões: $e');
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao carregar questões: $e');
+      }
+    }
+  }
+
+  /// Filtra questões baseado nos filtros selecionados
+  List<Map<String, dynamic>> _getQuestoesFiltradas() {
+    return _questoes.where((questao) {
+      // Filtro por disciplina
+      if (_disciplinaFiltro != null &&
+          questao['disciplinaId'] != _disciplinaFiltro) {
+        return false;
+      }
+
+      // Filtro por dificuldade
+      if (_dificuldadeFiltro != 'todas' &&
+          questao['dificuldade'] != _dificuldadeFiltro) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
+  /// Obtém o nome da disciplina pelo ID
+  String _getNomeDisciplina(String? disciplinaId) {
+    if (disciplinaId == null) return 'Disciplina não encontrada';
+
+    final disciplina = _disciplinas.firstWhere(
+      (d) => d['id'] == disciplinaId,
+      orElse: () => {'nome': 'Disciplina não encontrada'},
+    );
+
+    return disciplina['nome'] ?? 'Disciplina não encontrada';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,12 +228,13 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
           Expanded(
             child: Column(
               children: [
-                // Título e botão adicionar
+                // Título e botão na mesma linha
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Título
                       const Text(
                         'Banco de Questões',
                         style: TextStyle(
@@ -142,14 +244,20 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      // Botão adicionar
                       ElevatedButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const AdicionarQuestaoScreen(),
-                          ),
-                        ),
+                        onPressed: () async {
+                          final resultado = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const AdicionarQuestaoScreen(),
+                            ),
+                          );
+                          if (resultado == true) {
+                            _carregarDados(); // Recarregar se adicionou
+                          }
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _primaryColor,
                           foregroundColor: _whiteColor,
@@ -162,17 +270,25 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
                     ],
                   ),
                 ),
+                // Filtros
+                _buildFiltros(),
                 // Lista de questões
                 Expanded(
-                  child: _questoes.isEmpty
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _getQuestoesFiltradas().isEmpty
                       ? _buildEmptyState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _questoes.length,
-                          itemBuilder: (context, index) {
-                            final questao = _questoes[index];
-                            return _buildQuestaoCard(questao);
-                          },
+                      : RefreshIndicator(
+                          onRefresh: _carregarDados,
+                          color: _primaryColor,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _getQuestoesFiltradas().length,
+                            itemBuilder: (context, index) {
+                              final questao = _getQuestoesFiltradas()[index];
+                              return _buildQuestaoCard(questao);
+                            },
+                          ),
                         ),
                 ),
               ],
@@ -209,6 +325,93 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
     );
   }
 
+  /// Cria os filtros de busca
+  Widget _buildFiltros() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _whiteColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Filtro por disciplina
+          Expanded(
+            child: DropdownButtonFormField<String?>(
+              value: _disciplinaFiltro,
+              decoration: const InputDecoration(
+                labelText: 'Disciplina',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 10,
+                ),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Todas'),
+                ),
+                ..._disciplinas.map(
+                  (disciplina) => DropdownMenuItem<String?>(
+                    value: disciplina['id'],
+                    child: Text(
+                      disciplina['nome'] ?? 'Disciplina sem nome',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _disciplinaFiltro = value;
+                });
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Filtro por dificuldade
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              value: _dificuldadeFiltro,
+              decoration: const InputDecoration(
+                labelText: 'Dificuldade',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+              ),
+              items: const [
+                DropdownMenuItem<String>(value: 'todas', child: Text('Todas')),
+                DropdownMenuItem<String>(value: 'facil', child: Text('Fácil')),
+                DropdownMenuItem<String>(value: 'media', child: Text('Média')),
+                DropdownMenuItem<String>(
+                  value: 'dificil',
+                  child: Text('Difícil'),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _dificuldadeFiltro = value ?? 'todas';
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Cria um card para cada questão
   Widget _buildQuestaoCard(Map<String, dynamic> questao) {
     return Container(
@@ -234,19 +437,28 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildDificuldadeChip(questao['dificuldade']),
-                IconButton(
-                  onPressed: () => _editarQuestao(questao),
-                  icon: const Icon(Icons.edit),
-                  color: _primaryColor,
-                  tooltip: 'Editar questão',
+                _buildDificuldadeChip(questao['dificuldade'] ?? 'media'),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => _deletarQuestao(questao),
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      tooltip: 'Deletar questão',
+                    ),
+                    IconButton(
+                      onPressed: () => _editarQuestao(questao),
+                      icon: const Icon(Icons.edit),
+                      color: _primaryColor,
+                      tooltip: 'Editar questão',
+                    ),
+                  ],
                 ),
               ],
             ),
             const SizedBox(height: 12),
             // Enunciado
             Text(
-              questao['enunciado'],
+              questao['enunciado'] ?? 'Enunciado não disponível',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -259,9 +471,17 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
             // Informações da questão
             Row(
               children: [
-                _buildInfoChip(Icons.school, questao['curso'], Colors.blue),
+                _buildInfoChip(
+                  Icons.school,
+                  _getNomeDisciplina(questao['disciplinaId']),
+                  Colors.blue,
+                ),
                 const SizedBox(width: 8),
-                _buildInfoChip(Icons.book, questao['materia'], Colors.green),
+                _buildInfoChip(
+                  Icons.access_time,
+                  _formatarData(questao['dataCriacao']),
+                  Colors.green,
+                ),
               ],
             ),
           ],
@@ -273,18 +493,23 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
   /// Cria um chip de dificuldade
   Widget _buildDificuldadeChip(String dificuldade) {
     Color color;
+    String texto;
     switch (dificuldade.toLowerCase()) {
-      case 'fácil':
+      case 'facil':
         color = Colors.green;
+        texto = 'Fácil';
         break;
-      case 'médio':
+      case 'media':
         color = Colors.orange;
+        texto = 'Média';
         break;
-      case 'difícil':
+      case 'dificil':
         color = Colors.red;
+        texto = 'Difícil';
         break;
       default:
         color = Colors.grey;
+        texto = 'Média';
     }
 
     return Container(
@@ -295,7 +520,7 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Text(
-        dificuldade,
+        texto,
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -331,13 +556,66 @@ class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
     );
   }
 
+  /// Formata a data de criação
+  String _formatarData(dynamic timestamp) {
+    if (timestamp == null) return 'Data não disponível';
+
+    try {
+      final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return 'Data inválida';
+    }
+  }
+
+  /// Deleta uma questão
+  Future<void> _deletarQuestao(Map<String, dynamic> questao) async {
+    final confirmacao = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar exclusão'),
+        content: Text(
+          'Tem certeza que deseja deletar a questão:\n"${questao['enunciado']}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Deletar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmacao == true) {
+      try {
+        final sucesso = await _questionService.deletarQuestao(questao['id']);
+        if (sucesso) {
+          MessageUtils.mostrarSucesso(context, 'Questão deletada com sucesso!');
+          _carregarDados(); // Recarregar dados
+        } else {
+          MessageUtils.mostrarErro(context, 'Erro ao deletar questão');
+        }
+      } catch (e) {
+        MessageUtils.mostrarErro(context, 'Erro ao deletar questão: $e');
+      }
+    }
+  }
+
   /// Navega para a tela de editar questão
-  void _editarQuestao(Map<String, dynamic> questao) {
-    Navigator.push(
+  void _editarQuestao(Map<String, dynamic> questao) async {
+    final resultado = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EditarQuestaoScreen(questao: questao),
       ),
     );
+    if (resultado == true) {
+      _carregarDados(); // Recarregar se editou
+    }
   }
 }

@@ -24,8 +24,15 @@ class QuestionService {
 
     try {
       // Validar entrada
-      if (!_securityService.validarEntrada(enunciado, maxLength: 1000)) {
+      if (!_securityService.validarTexto(enunciado, maxLength: 1000)) {
         throw Exception('Enunciado da questão inválido');
+      }
+
+      // Validar explicação se fornecida
+      if (explicacao != null && explicacao.isNotEmpty) {
+        if (!_securityService.validarTexto(explicacao, maxLength: 1000)) {
+          throw Exception('Explicação da questão inválida');
+        }
       }
 
       // Validar opções
@@ -35,6 +42,13 @@ class QuestionService {
 
       if (opcoes.length > 10) {
         throw Exception('Questão não pode ter mais de 10 opções');
+      }
+
+      // Validar texto das opções
+      for (var opcao in opcoes.values) {
+        if (!_securityService.validarTexto(opcao['texto'], maxLength: 500)) {
+          throw Exception('Texto da opção inválido');
+        }
       }
 
       // Verificar se pelo menos uma opção está marcada como correta
@@ -64,11 +78,14 @@ class QuestionService {
       // Sanitizar opções
       Map<String, Map<String, dynamic>> opcoesSanitizadas = {};
       for (var entry in opcoes.entries) {
-        opcoesSanitizadas[entry.key] = {
-          'texto': _securityService.sanitizarEntrada(entry.value['texto']),
-          'correta': entry.value['correta'],
-          'ordem': entry.value['ordem'] ?? 1,
-        };
+        final texto = entry.value['texto'] as String?;
+        if (texto != null && texto.isNotEmpty) {
+          opcoesSanitizadas[entry.key] = {
+            'texto': _securityService.sanitizarEntrada(texto),
+            'correta': entry.value['correta'],
+            'ordem': entry.value['ordem'] ?? 1,
+          };
+        }
       }
 
       await questaoRef.set({
@@ -90,7 +107,7 @@ class QuestionService {
 
       await _securityService.registrarAtividadeSeguranca(
         'criar_questao',
-        'Questão criada: ${enunciadoSanitizado.substring(0, 50)}...',
+        'Questão criada: ${enunciadoSanitizado.length > 50 ? enunciadoSanitizado.substring(0, 50) + '...' : enunciadoSanitizado}',
         sucesso: true,
       );
 
@@ -137,12 +154,12 @@ class QuestionService {
   ) async {
     try {
       // Sanitizar dados se necessário
-      if (dados.containsKey('enunciado')) {
+      if (dados.containsKey('enunciado') && dados['enunciado'] != null) {
         dados['enunciado'] = _securityService.sanitizarEntrada(
           dados['enunciado'],
         );
       }
-      if (dados.containsKey('explicacao')) {
+      if (dados.containsKey('explicacao') && dados['explicacao'] != null) {
         dados['explicacao'] = _securityService.sanitizarEntrada(
           dados['explicacao'],
         );
@@ -177,15 +194,20 @@ class QuestionService {
   Future<bool> deletarQuestao(String questaoId) async {
     try {
       // Verificar se a questão está sendo usada em algum exame
-      final examesSnapshot = await _database
-          .ref('exames')
-          .orderByChild('questoes/$questaoId')
-          .get();
+      final examesSnapshot = await _database.ref('exames').get();
 
       if (examesSnapshot.exists) {
-        throw Exception(
-          'Não é possível deletar questão que está sendo usada em exames',
-        );
+        for (final child in examesSnapshot.children) {
+          final exame = child.value as Map<dynamic, dynamic>;
+          if (exame['questoes'] != null) {
+            final questoes = exame['questoes'] as Map<dynamic, dynamic>;
+            if (questoes.containsKey(questaoId)) {
+              throw Exception(
+                'Não é possível deletar questão que está sendo usada em exames',
+              );
+            }
+          }
+        }
       }
 
       await _database.ref('questoes/$questaoId').remove();
@@ -219,7 +241,8 @@ class QuestionService {
 
   /// Busca questões por tags
   Stream<DatabaseEvent> buscarQuestoesPorTag(String tag) {
-    return _database.ref('questoes').orderByChild('tags').equalTo(tag).onValue;
+    // Como tags é um array, vamos buscar todas as questões e filtrar no cliente
+    return _database.ref('questoes').onValue;
   }
 
   /// Lista questões por status
