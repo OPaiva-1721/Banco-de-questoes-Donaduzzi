@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../services/question_service.dart';
+import '../../../services/discipline_service.dart';
+import '../../../utils/message_utils.dart';
 
 class AdicionarQuestaoScreen extends StatefulWidget {
   const AdicionarQuestaoScreen({super.key});
@@ -14,85 +17,192 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
   static const Color _textColor = Color(0xFF333333);
   static const Color _whiteColor = Colors.white;
 
+  // Serviços
+  final QuestionService _questionService = QuestionService();
+  final DisciplineService _disciplineService = DisciplineService();
+
   // Controladores para os campos
   final TextEditingController _enunciadoController = TextEditingController();
+  final TextEditingController _explicacaoController = TextEditingController();
+  final List<TextEditingController> _opcoesControllers = [];
 
   // Estados dos dropdowns
-  String? _cursoSelecionado;
-  String? _materiaSelecionada;
-  String _dificuldadeSelecionada = 'Fácil';
+  String? _disciplinaSelecionada;
+  String _dificuldadeSelecionada = 'facil';
 
-  // Listas de opções
-  final List<String> _cursos = [
-    'Ciência da Computação',
-    'Engenharia de Software',
-    'Sistemas de Informação',
-    'Análise e Desenvolvimento de Sistemas',
-    'Tecnologia da Informação',
-  ];
+  // Estados das opções
+  final List<bool> _opcoesCorretas = [];
+  bool _isLoading = false;
 
-  final List<String> _materias = [
-    'Programação',
-    'Algoritmos',
-    'Estruturas de Dados',
-    'Banco de Dados',
-    'Engenharia de Software',
-    'Redes de Computadores',
-    'Inteligência Artificial',
-    'Desenvolvimento Mobile',
-  ];
+  // Listas de disciplinas carregadas do Firebase
+  List<Map<String, dynamic>> _disciplinas = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _adicionarOpcao(); // Adicionar primeira opção
+    _adicionarOpcao(); // Adicionar segunda opção
+    _carregarDisciplinas(); // Carregar disciplinas do Firebase
+  }
+
+  /// Carrega disciplinas do Firebase
+  Future<void> _carregarDisciplinas() async {
+    try {
+      final stream = _disciplineService.listarDisciplinas();
+      await for (final event in stream) {
+        if (event.snapshot.exists) {
+          final disciplinas = <Map<String, dynamic>>[];
+          for (final child in event.snapshot.children) {
+            final disciplina = {
+              'id': child.key,
+              ...Map<String, dynamic>.from(child.value as Map),
+            };
+            disciplinas.add(disciplina);
+          }
+          if (mounted) {
+            setState(() {
+              _disciplinas = disciplinas;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
+      }
+    }
+  }
 
   @override
   void dispose() {
     _enunciadoController.dispose();
+    _explicacaoController.dispose();
+    for (var controller in _opcoesControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
+  /// Adiciona uma nova opção à questão
+  void _adicionarOpcao() {
+    setState(() {
+      _opcoesControllers.add(TextEditingController());
+      _opcoesCorretas.add(false);
+    });
+  }
+
+  /// Remove uma opção da questão
+  void _removerOpcao(int index) {
+    if (_opcoesControllers.length > 2) {
+      setState(() {
+        _opcoesControllers[index].dispose();
+        _opcoesControllers.removeAt(index);
+        _opcoesCorretas.removeAt(index);
+      });
+    }
+  }
+
+  /// Alterna se uma opção está correta
+  void _alternarOpcaoCorreta(int index) {
+    setState(() {
+      _opcoesCorretas[index] = !_opcoesCorretas[index];
+    });
+  }
+
   /// Salva a questão após validar o formulário
-  void _salvarQuestao() {
-    if (_validarFormulario()) {
-      // TODO: Implementar a lógica para salvar no Firebase
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Questão salva com sucesso!'),
-          backgroundColor: _primaryColor,
-        ),
+  Future<void> _salvarQuestao() async {
+    if (!_validarFormulario()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Preparar opções para o Firebase
+      Map<String, Map<String, dynamic>> opcoes = {};
+      for (int i = 0; i < _opcoesControllers.length; i++) {
+        opcoes['opcao_${i + 1}'] = {
+          'texto': _opcoesControllers[i].text.trim(),
+          'correta': _opcoesCorretas[i],
+          'ordem': i + 1,
+        };
+      }
+
+      // Criar questão no Firebase
+      final questaoId = await _questionService.criarQuestao(
+        enunciado: _enunciadoController.text.trim(),
+        disciplinaId: _disciplinaSelecionada!,
+        opcoes: opcoes,
+        explicacao: _explicacaoController.text.trim().isEmpty
+            ? null
+            : _explicacaoController.text.trim(),
+        peso: 1.0,
       );
-      _limparFormulario();
+
+      if (questaoId != null) {
+        MessageUtils.mostrarSucesso(context, 'Questão salva com sucesso!');
+        _limparFormulario();
+        Navigator.pop(context, true); // Retorna true para indicar sucesso
+      } else {
+        MessageUtils.mostrarErro(context, 'Erro ao salvar questão');
+      }
+    } catch (e) {
+      MessageUtils.mostrarErro(context, 'Erro: ${e.toString()}');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   /// Valida se todos os campos obrigatórios foram preenchidos
   bool _validarFormulario() {
-    if (_cursoSelecionado == null) {
-      _mostrarErro('Selecione um curso');
-      return false;
-    }
-    if (_materiaSelecionada == null) {
-      _mostrarErro('Selecione uma matéria');
+    if (_disciplinaSelecionada == null) {
+      MessageUtils.mostrarErro(context, 'Selecione uma disciplina');
       return false;
     }
     if (_enunciadoController.text.trim().isEmpty) {
-      _mostrarErro('Digite o enunciado da questão');
+      MessageUtils.mostrarErro(context, 'Digite o enunciado da questão');
       return false;
     }
-    return true;
-  }
 
-  /// Exibe uma mensagem de erro para o usuário
-  void _mostrarErro(String mensagem) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensagem), backgroundColor: Colors.red),
-    );
+    // Validar opções
+    for (int i = 0; i < _opcoesControllers.length; i++) {
+      if (_opcoesControllers[i].text.trim().isEmpty) {
+        MessageUtils.mostrarErro(
+          context,
+          'Todas as opções devem ser preenchidas',
+        );
+        return false;
+      }
+    }
+
+    // Verificar se pelo menos uma opção está marcada como correta
+    bool temOpcaoCorreta = _opcoesCorretas.any((correta) => correta);
+    if (!temOpcaoCorreta) {
+      MessageUtils.mostrarErro(
+        context,
+        'Pelo menos uma opção deve estar marcada como correta',
+      );
+      return false;
+    }
+
+    return true;
   }
 
   /// Limpa todos os campos do formulário
   void _limparFormulario() {
     setState(() {
-      _cursoSelecionado = null;
-      _materiaSelecionada = null;
-      _dificuldadeSelecionada = 'Fácil';
+      _disciplinaSelecionada = null;
+      _dificuldadeSelecionada = 'facil';
       _enunciadoController.clear();
+      _explicacaoController.clear();
+
+      // Limpar opções
+      for (var controller in _opcoesControllers) {
+        controller.clear();
+      }
+      _opcoesCorretas.fillRange(0, _opcoesCorretas.length, false);
     });
   }
 
@@ -117,13 +227,13 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
   }
 
   /// Cria um botão de seleção de dificuldade
-  Widget _buildDificuldadeButton(String dificuldade, int index) {
-    final isSelected = _dificuldadeSelecionada == dificuldade;
+  Widget _buildDificuldadeButton(String label, String value) {
+    final isSelected = _dificuldadeSelecionada == value;
 
     return GestureDetector(
       onTap: () {
         setState(() {
-          _dificuldadeSelecionada = dificuldade;
+          _dificuldadeSelecionada = value;
         });
       },
       child: Container(
@@ -142,7 +252,7 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
         ),
         child: Center(
           child: Text(
-            dificuldade,
+            label,
             style: TextStyle(
               color: isSelected ? _whiteColor : _textColor,
               fontFamily: 'Inter-Bold',
@@ -150,6 +260,87 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
               fontWeight: FontWeight.bold,
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Cria um card para cada opção de resposta
+  Widget _buildOpcaoCard(int index) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: _whiteColor,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            offset: const Offset(0, 2),
+            blurRadius: 4,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Checkbox para marcar como correta
+            Checkbox(
+              value: _opcoesCorretas[index],
+              onChanged: (value) => _alternarOpcaoCorreta(index),
+              activeColor: _primaryColor,
+            ),
+            const SizedBox(width: 8),
+            // Campo de texto da opção
+            Expanded(
+              child: TextField(
+                controller: _opcoesControllers[index],
+                decoration: InputDecoration(
+                  hintText: 'Opção ${index + 1}',
+                  hintStyle: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: _opcoesCorretas[index]
+                          ? _primaryColor
+                          : Colors.grey[300]!,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: _opcoesCorretas[index]
+                          ? _primaryColor
+                          : Colors.grey[300]!,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: _primaryColor,
+                      width: 2,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Botão para remover opção (se houver mais de 2)
+            if (_opcoesControllers.length > 2)
+              IconButton(
+                onPressed: () => _removerOpcao(index),
+                icon: const Icon(Icons.remove_circle_outline),
+                color: Colors.red,
+                tooltip: 'Remover opção',
+              ),
+          ],
         ),
       ),
     );
@@ -251,9 +442,9 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Campo Curso
+                  // Campo Disciplina
                   const Text(
-                    'Curso(s)',
+                    'Disciplina',
                     style: TextStyle(
                       color: _textColor,
                       fontFamily: 'Inter-Bold',
@@ -265,11 +456,11 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
                   _buildContainer(
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
-                        value: _cursoSelecionado,
+                        value: _disciplinaSelecionada,
                         hint: const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
-                            'Selecione o(s) curso(s)',
+                            'Selecione a disciplina',
                             style: TextStyle(
                               color: Colors.black54,
                               fontSize: 16,
@@ -277,67 +468,22 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
                             ),
                           ),
                         ),
-                        items: _cursos.map((String curso) {
+                        items: _disciplinas.map((disciplina) {
                           return DropdownMenuItem<String>(
-                            value: curso,
+                            value: disciplina['id'],
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                               ),
-                              child: Text(curso),
+                              child: Text(
+                                disciplina['nome'] ?? 'Disciplina sem nome',
+                              ),
                             ),
                           );
                         }).toList(),
                         onChanged: (String? newValue) {
                           setState(() {
-                            _cursoSelecionado = newValue;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Campo Matéria
-                  const Text(
-                    'Matéria',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontFamily: 'Inter-Bold',
-                      fontSize: 25,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildContainer(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _materiaSelecionada,
-                        hint: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'Selecione a matéria',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w300,
-                            ),
-                          ),
-                        ),
-                        items: _materias.map((String materia) {
-                          return DropdownMenuItem<String>(
-                            value: materia,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Text(materia),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _materiaSelecionada = newValue;
+                            _disciplinaSelecionada = newValue;
                           });
                         },
                       ),
@@ -360,11 +506,11 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildDificuldadeButton('Fácil', 0),
-                        const SizedBox(width: 20),
-                        _buildDificuldadeButton('Médio', 1),
-                        const SizedBox(width: 20),
-                        _buildDificuldadeButton('Difícil', 2),
+                        _buildDificuldadeButton('Fácil', 'facil'),
+                        const SizedBox(width: 12),
+                        _buildDificuldadeButton('Médio', 'medio'),
+                        const SizedBox(width: 12),
+                        _buildDificuldadeButton('Difícil', 'dificil'),
                       ],
                     ),
                   ),
@@ -400,13 +546,83 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
                   ),
                   const SizedBox(height: 32),
 
+                  // Seção de Opções
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Opções de Resposta',
+                        style: TextStyle(
+                          color: _textColor,
+                          fontFamily: 'Inter-Bold',
+                          fontSize: 25,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: _adicionarOpcao,
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Adicionar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                          foregroundColor: _whiteColor,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Lista de Opções
+                  ...List.generate(_opcoesControllers.length, (index) {
+                    return _buildOpcaoCard(index);
+                  }),
+                  const SizedBox(height: 32),
+
+                  // Campo Explicação (Opcional)
+                  const Text(
+                    'Explicação (Opcional)',
+                    style: TextStyle(
+                      color: _textColor,
+                      fontFamily: 'Inter-Bold',
+                      fontSize: 25,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildContainer(
+                    height: 80,
+                    child: TextField(
+                      controller: _explicacaoController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText:
+                            'Insira uma explicação para a resposta correta',
+                        hintStyle: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w300,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.all(16),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
                   // Botões de Ação
                   Center(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         ElevatedButton(
-                          onPressed: _salvarQuestao,
+                          onPressed: _isLoading ? null : _salvarQuestao,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _primaryColor,
                             foregroundColor: _whiteColor,
@@ -419,17 +635,28 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
                             ),
                             elevation: 4,
                           ),
-                          child: const Text(
-                            'Salvar Questão',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      _whiteColor,
+                                    ),
+                                  ),
+                                )
+                              : const Text(
+                                  'Salvar Questão',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                         const SizedBox(width: 16),
                         ElevatedButton(
-                          onPressed: _limparFormulario,
+                          onPressed: _isLoading ? null : _limparFormulario,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey[600],
                             foregroundColor: _whiteColor,

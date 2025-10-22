@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../utils/message_utils.dart';
+import '../../utils/firebase_data_populator.dart';
 import '../../services/firebase_service.dart';
 import '../auth/tela_login.dart';
 import '../professor/criar_prova/criar_prova_screen.dart';
 import '../professor/banco_questoes/banco_questoes_menu_screen.dart';
 import '../professor/provas_geradas_screen.dart';
+import '../professor/disciplinas/gerenciar_disciplinas_screen.dart';
+import '../professor/cursos/gerenciar_cursos_screen.dart';
 
 class TelaInicio extends StatelessWidget {
   const TelaInicio({super.key});
@@ -162,6 +165,24 @@ class TelaInicio extends StatelessWidget {
         icon: Icons.history,
         onTap: () => _navegarParaProvasGeradas(context),
       ),
+      _CardData(
+        title: "Gerenciar Disciplinas",
+        subtitle: "Adicione, edite ou gerencie as disciplinas do sistema.",
+        icon: Icons.school,
+        onTap: () => _navegarParaDisciplinas(context),
+      ),
+      _CardData(
+        title: "Gerenciar Cursos",
+        subtitle: "Adicione, edite ou gerencie os cursos do sistema.",
+        icon: Icons.school_outlined,
+        onTap: () => _navegarParaCursos(context),
+      ),
+      _CardData(
+        title: "Popular Dados",
+        subtitle: "Adicione dados de exemplo (cursos e disciplinas).",
+        icon: Icons.data_usage,
+        onTap: () => _popularDados(context),
+      ),
     ];
 
     return Column(
@@ -284,6 +305,87 @@ class TelaInicio extends StatelessWidget {
       context,
       MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
     );
+  }
+
+  void _navegarParaDisciplinas(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const GerenciarDisciplinasScreen(),
+      ),
+    );
+  }
+
+  void _navegarParaCursos(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const GerenciarCursosScreen()),
+    );
+  }
+
+  void _popularDados(BuildContext context) async {
+    final confirmacao = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Popular Dados'),
+        content: const Text(
+          'Deseja adicionar dados de exemplo ao Firebase?\n\n'
+          'Isso irá adicionar:\n'
+          '• 5 cursos\n'
+          '• 30 disciplinas\n\n'
+          'Esta ação pode demorar alguns segundos.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Popular'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmacao == true) {
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Populando dados...'),
+            ],
+          ),
+        ),
+      );
+
+      try {
+        await FirebaseDataPopulator.popularTodosDados();
+
+        // Fechar loading
+        Navigator.pop(context);
+
+        // Mostrar sucesso
+        MessageUtils.mostrarSucesso(
+          context,
+          'Dados populados com sucesso!\n\n'
+          'Adicionados:\n'
+          '• 5 cursos\n'
+          '• 30 disciplinas',
+        );
+      } catch (e) {
+        // Fechar loading
+        Navigator.pop(context);
+
+        // Mostrar erro
+        MessageUtils.mostrarErro(context, 'Erro ao popular dados: $e');
+      }
+    }
   }
 
   // Método para fazer logout

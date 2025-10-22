@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
-import '../../services/exam_service.dart';
-import '../../services/discipline_service.dart';
-import '../../utils/message_utils.dart';
+import '../../../services/discipline_service.dart';
+import '../../../utils/message_utils.dart';
+import 'adicionar_disciplina_screen.dart';
+import 'editar_disciplina_screen.dart';
 
-class ProvasGeradasScreen extends StatefulWidget {
-  const ProvasGeradasScreen({super.key});
+class GerenciarDisciplinasScreen extends StatefulWidget {
+  const GerenciarDisciplinasScreen({super.key});
 
   @override
-  State<ProvasGeradasScreen> createState() => _ProvasGeradasScreenState();
+  State<GerenciarDisciplinasScreen> createState() =>
+      _GerenciarDisciplinasScreenState();
 }
 
-class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
+class _GerenciarDisciplinasScreenState
+    extends State<GerenciarDisciplinasScreen> {
   // Constantes de cores
   static const Color _primaryColor = Color(0xFF541822);
   static const Color _backgroundColor = Color(0xFFF5F5F5);
@@ -18,11 +21,9 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
   static const Color _whiteColor = Colors.white;
 
   // Serviços
-  final ExamService _examService = ExamService();
   final DisciplineService _disciplineService = DisciplineService();
 
   // Estados
-  List<Map<String, dynamic>> _provas = [];
   List<Map<String, dynamic>> _disciplinas = [];
   bool _isLoading = true;
   String _filtroStatus = 'todas';
@@ -30,34 +31,15 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
   @override
   void initState() {
     super.initState();
-    _carregarDados();
-  }
-
-  /// Carrega provas e disciplinas do Firebase
-  Future<void> _carregarDados() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Carregar disciplinas
-      await _carregarDisciplinas();
-
-      // Carregar provas
-      await _carregarProvas();
-    } catch (e) {
-      MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+    _carregarDisciplinas();
   }
 
   /// Carrega disciplinas do Firebase
   Future<void> _carregarDisciplinas() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final stream = _disciplineService.listarDisciplinas();
       await for (final event in stream) {
@@ -70,62 +52,28 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
             };
             disciplinas.add(disciplina);
           }
-          if (mounted) {
-            setState(() {
-              _disciplinas = disciplinas;
-            });
-          }
+          setState(() {
+            _disciplinas = disciplinas;
+            _isLoading = false;
+          });
         }
       }
     } catch (e) {
-      print('Erro ao carregar disciplinas: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
     }
   }
 
-  /// Carrega provas do Firebase
-  Future<void> _carregarProvas() async {
-    try {
-      final stream = _examService.listarExames();
-      await for (final event in stream) {
-        if (event.snapshot.exists) {
-          final provas = <Map<String, dynamic>>[];
-          for (final child in event.snapshot.children) {
-            final prova = {
-              'id': child.key,
-              ...Map<String, dynamic>.from(child.value as Map),
-            };
-            provas.add(prova);
-          }
-          if (mounted) {
-            setState(() {
-              _provas = provas;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      print('Erro ao carregar provas: $e');
-    }
-  }
-
-  /// Filtra provas baseado no status
-  List<Map<String, dynamic>> _getProvasFiltradas() {
+  /// Filtra disciplinas baseado no status
+  List<Map<String, dynamic>> _getDisciplinasFiltradas() {
     if (_filtroStatus == 'todas') {
-      return _provas;
+      return _disciplinas;
     }
-    return _provas.where((prova) => prova['status'] == _filtroStatus).toList();
-  }
-
-  /// Obtém o nome da disciplina pelo ID
-  String _getNomeDisciplina(String? disciplinaId) {
-    if (disciplinaId == null) return 'Disciplina não encontrada';
-
-    final disciplina = _disciplinas.firstWhere(
-      (d) => d['id'] == disciplinaId,
-      orElse: () => {'nome': 'Disciplina não encontrada'},
-    );
-
-    return disciplina['nome'] ?? 'Disciplina não encontrada';
+    return _disciplinas
+        .where((disciplina) => disciplina['status'] == _filtroStatus)
+        .toList();
   }
 
   /// Formata a data de criação
@@ -140,14 +88,14 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     }
   }
 
-  /// Deleta uma prova
-  Future<void> _deletarProva(Map<String, dynamic> prova) async {
+  /// Deleta uma disciplina
+  Future<void> _deletarDisciplina(Map<String, dynamic> disciplina) async {
     final confirmacao = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar exclusão'),
         content: Text(
-          'Tem certeza que deseja deletar a prova:\n"${prova['titulo']}"?',
+          'Tem certeza que deseja deletar a disciplina:\n"${disciplina['nome']}"?',
         ),
         actions: [
           TextButton(
@@ -165,16 +113,45 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
 
     if (confirmacao == true) {
       try {
-        final sucesso = await _examService.deletarExame(prova['id']);
+        final sucesso = await _disciplineService.deletarDisciplina(
+          disciplina['id'],
+        );
         if (sucesso) {
-          MessageUtils.mostrarSucesso(context, 'Prova deletada com sucesso!');
-          _carregarDados(); // Recarregar dados
+          MessageUtils.mostrarSucesso(
+            context,
+            'Disciplina deletada com sucesso!',
+          );
+          _carregarDisciplinas(); // Recarregar dados
         } else {
-          MessageUtils.mostrarErro(context, 'Erro ao deletar prova');
+          MessageUtils.mostrarErro(context, 'Erro ao deletar disciplina');
         }
       } catch (e) {
-        MessageUtils.mostrarErro(context, 'Erro ao deletar prova: $e');
+        MessageUtils.mostrarErro(context, 'Erro ao deletar disciplina: $e');
       }
+    }
+  }
+
+  /// Altera o status de uma disciplina
+  Future<void> _alterarStatusDisciplina(Map<String, dynamic> disciplina) async {
+    final novoStatus = disciplina['status'] == 'ativo' ? 'inativo' : 'ativo';
+
+    try {
+      final sucesso = await _disciplineService.alterarStatusDisciplina(
+        disciplina['id'],
+        novoStatus,
+      );
+
+      if (sucesso) {
+        MessageUtils.mostrarSucesso(
+          context,
+          'Status alterado para ${novoStatus == 'ativo' ? 'ativo' : 'inativo'}!',
+        );
+        _carregarDisciplinas(); // Recarregar dados
+      } else {
+        MessageUtils.mostrarErro(context, 'Erro ao alterar status');
+      }
+    } catch (e) {
+      MessageUtils.mostrarErro(context, 'Erro ao alterar status: $e');
     }
   }
 
@@ -257,14 +234,14 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
           Expanded(
             child: Column(
               children: [
-                // Título
+                // Título e botão adicionar
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Provas Geradas',
+                        'Gerenciar Disciplinas',
                         style: TextStyle(
                           color: _textColor,
                           fontFamily: 'Inter-Bold',
@@ -272,23 +249,46 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final resultado = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const AdicionarDisciplinaScreen(),
+                            ),
+                          );
+                          if (resultado == true) {
+                            _carregarDisciplinas(); // Recarregar se adicionou
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                          foregroundColor: _whiteColor,
+                          padding: const EdgeInsets.all(12),
+                          shape: const CircleBorder(),
+                          elevation: 4,
+                        ),
+                        child: const Icon(Icons.add, size: 24),
+                      ),
                     ],
                   ),
                 ),
                 // Filtro de status
                 _buildFiltroStatus(),
-                // Lista de provas
+                // Lista de disciplinas
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
-                      : _getProvasFiltradas().isEmpty
+                      : _getDisciplinasFiltradas().isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _getProvasFiltradas().length,
+                          itemCount: _getDisciplinasFiltradas().length,
                           itemBuilder: (context, index) {
-                            final prova = _getProvasFiltradas()[index];
-                            return _buildProvaCard(prova);
+                            final disciplina =
+                                _getDisciplinasFiltradas()[index];
+                            return _buildDisciplinaCard(disciplina);
                           },
                         ),
                 ),
@@ -300,16 +300,16 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     );
   }
 
-  /// Cria o estado vazio quando não há provas
+  /// Cria o estado vazio quando não há disciplinas
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.quiz_outlined, size: 80, color: Colors.grey[400]),
+          Icon(Icons.school_outlined, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 24),
           Text(
-            'Nenhuma prova gerada',
+            'Nenhuma disciplina cadastrada',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -318,7 +318,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Crie uma nova prova para começar',
+            'Clique em "+" para adicionar uma disciplina',
             style: TextStyle(fontSize: 16, color: Colors.grey[500]),
           ),
         ],
@@ -366,17 +366,10 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
               ),
               items: const [
                 DropdownMenuItem<String>(value: 'todas', child: Text('Todas')),
+                DropdownMenuItem<String>(value: 'ativo', child: Text('Ativas')),
                 DropdownMenuItem<String>(
-                  value: 'rascunho',
-                  child: Text('Rascunho'),
-                ),
-                DropdownMenuItem<String>(
-                  value: 'finalizada',
-                  child: Text('Finalizada'),
-                ),
-                DropdownMenuItem<String>(
-                  value: 'aplicada',
-                  child: Text('Aplicada'),
+                  value: 'inativo',
+                  child: Text('Inativas'),
                 ),
               ],
               onChanged: (value) {
@@ -391,9 +384,9 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     );
   }
 
-  /// Cria um card para cada prova
-  Widget _buildProvaCard(Map<String, dynamic> prova) {
-    final status = prova['status'] ?? 'rascunho';
+  /// Cria um card para cada disciplina
+  Widget _buildDisciplinaCard(Map<String, dynamic> disciplina) {
+    final isAtivo = disciplina['status'] == 'ativo';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -418,34 +411,47 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildStatusChip(status),
+                _buildStatusChip(isAtivo),
                 Row(
                   children: [
                     IconButton(
-                      onPressed: () => _deletarProva(prova),
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      tooltip: 'Deletar prova',
+                      onPressed: () => _alterarStatusDisciplina(disciplina),
+                      icon: Icon(
+                        isAtivo ? Icons.pause : Icons.play_arrow,
+                        color: isAtivo ? Colors.orange : Colors.green,
+                      ),
+                      tooltip: isAtivo ? 'Desativar' : 'Ativar',
                     ),
                     IconButton(
-                      onPressed: () {
-                        // TODO: Implementar visualização/edição da prova
-                        MessageUtils.mostrarSucesso(
+                      onPressed: () => _deletarDisciplina(disciplina),
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      tooltip: 'Deletar disciplina',
+                    ),
+                    IconButton(
+                      onPressed: () async {
+                        final resultado = await Navigator.push(
                           context,
-                          'Funcionalidade em desenvolvimento',
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EditarDisciplinaScreen(disciplina: disciplina),
+                          ),
                         );
+                        if (resultado == true) {
+                          _carregarDisciplinas(); // Recarregar se editou
+                        }
                       },
-                      icon: const Icon(Icons.visibility),
+                      icon: const Icon(Icons.edit),
                       color: _primaryColor,
-                      tooltip: 'Visualizar prova',
+                      tooltip: 'Editar disciplina',
                     ),
                   ],
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            // Título da prova
+            // Nome da disciplina
             Text(
-              prova['titulo'] ?? 'Prova sem título',
+              disciplina['nome'] ?? 'Disciplina sem nome',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -453,33 +459,33 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            // Informações da prova
+            // Informações da disciplina
             Row(
               children: [
                 _buildInfoChip(
                   Icons.school,
-                  _getNomeDisciplina(prova['disciplinaId']),
+                  'Semestre ${disciplina['semestre'] ?? 'N/A'}',
                   Colors.blue,
                 ),
                 const SizedBox(width: 8),
                 _buildInfoChip(
-                  Icons.quiz,
-                  '${prova['estatisticas']?['totalQuestoes'] ?? 0} questões',
+                  Icons.access_time,
+                  '${disciplina['cargaHoraria'] ?? 0}h',
                   Colors.green,
                 ),
                 const SizedBox(width: 8),
                 _buildInfoChip(
                   Icons.calendar_today,
-                  _formatarData(prova['dataCriacao']),
+                  _formatarData(disciplina['dataCriacao']),
                   Colors.orange,
                 ),
               ],
             ),
-            if (prova['instrucoes'] != null &&
-                prova['instrucoes'].isNotEmpty) ...[
+            if (disciplina['descricao'] != null &&
+                disciplina['descricao'].isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                prova['instrucoes'],
+                disciplina['descricao'],
                 style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -492,40 +498,22 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
   }
 
   /// Cria um chip de status
-  Widget _buildStatusChip(String status) {
-    Color color;
-    String texto;
-    switch (status.toLowerCase()) {
-      case 'rascunho':
-        color = Colors.orange;
-        texto = 'Rascunho';
-        break;
-      case 'finalizada':
-        color = Colors.green;
-        texto = 'Finalizada';
-        break;
-      case 'aplicada':
-        color = Colors.blue;
-        texto = 'Aplicada';
-        break;
-      default:
-        color = Colors.grey;
-        texto = 'Rascunho';
-    }
-
+  Widget _buildStatusChip(bool isAtivo) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: (isAtivo ? Colors.green : Colors.red).withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(
+          color: (isAtivo ? Colors.green : Colors.red).withOpacity(0.3),
+        ),
       ),
       child: Text(
-        texto,
+        isAtivo ? 'Ativa' : 'Inativa',
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: color,
+          color: isAtivo ? Colors.green : Colors.red,
         ),
       ),
     );

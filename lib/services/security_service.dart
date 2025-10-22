@@ -13,8 +13,16 @@ class SecurityService {
     if (entrada.isEmpty) return false;
     if (maxLength != null && entrada.length > maxLength) return false;
 
-    // Verificar caracteres perigosos
-    final caracteresPerigosos = ['<', '>', '"', "'", '&', ';', '(', ')'];
+    // Verificar caracteres perigosos (apenas os realmente perigosos para XSS)
+    final caracteresPerigosos = [
+      '<',
+      '>',
+      '&lt;',
+      '&gt;',
+      '&amp;',
+      '&quot;',
+      '&#x27;',
+    ];
     for (var char in caracteresPerigosos) {
       if (entrada.contains(char)) return false;
     }
@@ -31,6 +39,28 @@ class SecurityService {
         .replaceAll("'", '&#x27;')
         .replaceAll('&', '&amp;')
         .trim();
+  }
+
+  /// Valida entrada de texto (aceita acentos e caracteres especiais)
+  bool validarTexto(String texto, {int? maxLength}) {
+    if (texto.isEmpty) return false;
+    if (maxLength != null && texto.length > maxLength) return false;
+
+    // Verificar apenas caracteres realmente perigosos para XSS
+    final caracteresPerigosos = [
+      '<',
+      '>',
+      '&lt;',
+      '&gt;',
+      '&amp;',
+      '&quot;',
+      '&#x27;',
+    ];
+    for (var char in caracteresPerigosos) {
+      if (texto.contains(char)) return false;
+    }
+
+    return true;
   }
 
   // ========== LOGS DE SEGURANÇA ==========
