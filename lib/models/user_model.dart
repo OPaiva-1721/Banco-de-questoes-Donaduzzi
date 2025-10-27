@@ -1,31 +1,27 @@
 import 'package:firebase_database/firebase_database.dart';
 
-/// Modelo para `AppUser` (Usuário)
-/// Armazena dados do usuário no RTDB, complementando o Firebase Auth.
+/// Model for `AppUser`
+/// Stores user data in the Realtime Database, complementing Firebase Auth.
 class AppUser {
-  final String uid; // ID do Firebase Auth (é o 'key' do nó)
+  final String uid; // Firebase Auth UID (is the node 'key')
   final String? name;
   final String? email;
-  final String? userType; // Ex: 'professor', 'aluno'
+  final String? userType; // e.g., 'professor', 'coordinator'
 
   AppUser({required this.uid, this.name, this.email, this.userType});
 
+  /// Converts the object to a Map (JSON) for Firebase.
   Map<String, dynamic> toJson() {
     return {'name': name, 'email': email, 'userType': userType};
   }
 
-  static Map<String, dynamic> _dataToMap(DataSnapshot snapshot) {
-    final value = snapshot.value;
-    if (value is Map) {
-      return Map<String, dynamic>.from(value.cast<dynamic, dynamic>());
-    }
-    return {};
-  }
-
+  /// Creates an object from a Firebase DataSnapshot.
   factory AppUser.fromSnapshot(DataSnapshot snapshot) {
-    final data = _dataToMap(snapshot);
+    // Helper to read the data as a Map
+    final data = Map<String, dynamic>.from(snapshot.value as Map);
+
     return AppUser(
-      uid: snapshot.key!, // O ID do nó é o UID do Auth
+      uid: snapshot.key!, // The node ID is the Auth UID
       name: data['name'],
       email: data['email'],
       userType: data['userType'],

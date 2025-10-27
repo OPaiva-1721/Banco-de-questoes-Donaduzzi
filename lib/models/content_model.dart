@@ -4,12 +4,12 @@ import 'package:firebase_database/firebase_database.dart';
 class Content {
   final String? id;
   final String description;
-  final String disciplineId; // Foreign Key para Discipline/Subject
+  final String subjectId; // Foreign Key para Discipline/Subject
 
-  Content({this.id, required this.description, required this.disciplineId});
+  Content({this.id, required this.description, required this.subjectId});
 
   Map<String, dynamic> toJson() {
-    return {'description': description, 'disciplineId': disciplineId};
+    return {'description': description, 'subjectId': subjectId};
   }
 
   static Map<String, dynamic> _dataToMap(DataSnapshot snapshot) {
@@ -25,7 +25,7 @@ class Content {
     return Content(
       id: snapshot.key,
       description: data['description'] ?? '',
-      disciplineId: data['disciplineId'] ?? '',
+      subjectId: data['subjectId'] ?? '',
     );
   }
 }

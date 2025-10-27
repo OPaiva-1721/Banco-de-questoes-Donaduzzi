@@ -1,247 +1,198 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:prova/models/user_model.dart';
 import 'security_service.dart';
+import 'user_service.dart';
 
-/// Serviço responsável por todas as operações de autenticação
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-  final FirebaseDatabase _database = FirebaseDatabase.instance;
   final SecurityService _securityService = SecurityService();
 
-  // ========== CONSTANTES ==========
-  static const String tipoProfessor = 'professor';
-  static const String tipoCoordenador = 'coordenador';
+  // Dependência: O AuthService precisa do UserService
+  final UserService _userService;
 
-  // ========== MÉTODOS DE AUTENTICAÇÃO ==========
+  // Construtor: Recebe o UserService
+  AuthService(this._userService);
 
-  /// Registra um novo usuário no sistema
-  ///
-  /// [email] Email do usuário (deve ser válido)
-  /// [senha] Senha do usuário (deve atender aos critérios de segurança)
-  /// [nome] Nome completo do usuário
-  ///
-  /// Retorna [UserCredential] se bem-sucedido, null caso contrário
-  ///
-  /// Lança [FirebaseAuthException] em caso de erro de autenticação
-  /// Lança [Exception] se as validações falharem
-  Future<UserCredential?> registrarUsuario(
-    String email,
-    String senha,
-    String nome,
-  ) async {
+  /// Stream para ouvir mudanças no estado de login (usuário logado/deslogado)
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  /// Pega o usuário atualmente logado no Firebase Auth
+  User? get currentUser => _auth.currentUser;
+
+  /// Registra um novo usuário (e-mail/senha)
+  Future<UserCredential> registerUser({
+    required String email,
+    required String password,
+    required String name,
+    String userType = 'professor', // Tipo padrão
+  }) async {
+    // Validação básica
+    if (!_securityService.validateText(email, maxLength: 100) ||
+        !email.contains('@')) {
+      throw Exception('Invalid email address.');
+    }
+    if (!_securityService.validateText(password, maxLength: 100) ||
+        password.length < 6) {
+      throw Exception('Password must be at least 6 characters.');
+    }
+    if (!_securityService.validateText(name, maxLength: 50)) {
+      throw Exception('Invalid name.');
+    }
+
+    UserCredential userCredential;
     try {
-      // Validar entradas
-      if (!_securityService.validarEntrada(email, maxLength: 100)) {
-        throw Exception('Email inválido');
-      }
-      if (!_securityService.validarEntrada(nome, maxLength: 100)) {
-        throw Exception('Nome inválido');
-      }
-      if (senha.length < 8) {
-        throw Exception('Senha deve ter pelo menos 6 caracteres');
-      }
-
-      // Criar usuário no Firebase Auth
-      final UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(email: email, password: senha);
-
-      // Atualizar o perfil do usuário
-      await userCredential.user?.updateDisplayName(nome);
-
-      // Sanitizar dados antes de salvar
-      final nomeSanitizado = _securityService.sanitizarEntrada(nome);
-      final emailSanitizado = _securityService.sanitizarEntrada(email);
-      // Salvar dados adicionais no Realtime Database
-      final userRef = _database.ref('usuarios/${userCredential.user!.uid}');
-      await userRef.set({
-        'nome': nomeSanitizado,
-        'email': emailSanitizado,
-        'dataCriacao': ServerValue.timestamp,
-        'tipo': tipoProfessor,
-        'status': 'ativo',
-        'emailVerificado': false,
-        'grupoId': null,
-        'permissoes': {
-          'gerenciarProfessores': false,
-          'gerenciarCoordenadores': false,
-          'visualizarTodasProvas': false,
-          'criarProvas': true,
-          'editarProvas': true,
-          'deletarProvas': true,
-        },
-      });
-
-      // Enviar email de verificação
-      await userCredential.user?.sendEmailVerification();
-
-      // Registrar atividade de segurança
-      await _securityService.registrarAtividadeSeguranca(
-        'registro_usuario',
-        'Novo usuário registrado: $email',
-        sucesso: true,
+      // 1. Cria o usuário no Firebase Authentication
+      userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
       );
 
+      final user = userCredential.user;
+      if (user != null) {
+        // (Opcional) Atualiza o nome no perfil do Auth
+        await user.updateDisplayName(name);
+        await user.reload();
+
+        // 2. Prepara os dados para salvar no Realtime Database
+        final newUserRecord = AppUser(
+          uid: user.uid, // Usa o UID do Auth como chave
+          name: name,
+          email: email,
+          userType: userType,
+        );
+
+        // 3. Chama o UserService para salvar os dados no banco
+        await _userService.createUserRecord(newUserRecord);
+
+        await _securityService.logSecurityActivity(
+          'register_user',
+          'User ${user.uid} registered successfully.',
+          success: true,
+        );
+      }
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print('Erro de autenticação: ${e.code} - ${e.message}');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_registro',
-        'Erro ao registrar usuário: ${e.code}',
-        sucesso: false,
+      await _securityService.logSecurityActivity(
+        'error_register_user',
+        'Error: ${e.message}',
+        success: false,
       );
-      rethrow;
-    } catch (e) {
-      print('Erro ao registrar usuário: $e');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_registro',
-        'Erro geral ao registrar usuário: $e',
-        sucesso: false,
-      );
-      rethrow;
+      throw Exception(e.message); // Lança o erro para a UI
     }
   }
 
-  /// Fazer login usando Firebase Auth
-  Future<UserCredential?> fazerLogin(String email, String senha) async {
+  /// Faz login com e-mail e senha
+  Future<UserCredential> signIn({
+    required String email,
+    required String password,
+  }) async {
     try {
-      // Fazer login no Firebase Auth
-      final UserCredential userCredential = await _auth
-          .signInWithEmailAndPassword(email: email, password: senha);
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
+      await _securityService.logSecurityActivity(
+        'sign_in_email',
+        'User ${userCredential.user?.uid} signed in.',
+        success: true,
+      );
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print('Erro de autenticação: ${e.code} - ${e.message}');
-      rethrow;
-    } catch (e) {
-      print('Erro ao fazer login: $e');
-      rethrow;
+      await _securityService.logSecurityActivity(
+        'error_sign_in_email',
+        'Error: ${e.message}',
+        success: false,
+      );
+      throw Exception(e.message);
     }
   }
 
-  /// Fazer login com Google
-  Future<UserCredential?> fazerLoginComGoogle() async {
+  /// Faz login ou registro com Google
+  Future<UserCredential> signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        return null;
+        throw Exception('Google Sign-In aborted by user.');
       }
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
+      final AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential result = await _auth.signInWithCredential(
-        credential,
-      );
+      // Entra no Firebase Auth
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
 
-      // Salvar dados do usuário se for novo
-      if (result.additionalUserInfo?.isNewUser == true) {
-        // Todos os novos usuários são professores por padrão
+      if (user != null) {
+        // Verifica se já existe um registro no banco de dados para esse usuário
+        final existingUser = await _userService.getUserData(user.uid);
 
-        // Sanitizar dados
-        final nome = _securityService.sanitizarEntrada(
-          result.user!.displayName ?? '',
+        // Prepara os dados (mantém o tipo se já existe, senão 'professor')
+        final userRecord = AppUser(
+          uid: user.uid,
+          name: user.displayName,
+          email: user.email,
+          userType: existingUser?.userType ?? 'professor',
         );
-        final email = _securityService.sanitizarEntrada(
-          result.user!.email ?? '',
-        );
 
-        // Criar documento completo do usuário no Realtime Database
-        final userRef = _database.ref('usuarios/${result.user!.uid}');
-        await userRef.set({
-          'nome': nome,
-          'email': email,
-          'dataCriacao': ServerValue.timestamp,
-          'tipo': tipoProfessor,
-          'status': 'ativo',
-          'emailVerificado': true, // Google já verifica o email
-          'grupoId': null,
-          'permissoes': {
-            'gerenciarProfessores': false,
-            'gerenciarCoordenadores': false,
-            'visualizarTodasProvas': false,
-            'criarProvas': true,
-            'editarProvas': true,
-            'deletarProvas': true,
-          },
-        });
+        // Cria ou atualiza o registro no banco de dados
+        await _userService.createUserRecord(userRecord);
 
-        // Registrar atividade de segurança
-        await _securityService.registrarAtividadeSeguranca(
-          'registro_usuario_google',
-          'Novo usuário Google registrado: $email (professor)',
-          sucesso: true,
-        );
-      } else {
-        // Registrar atividade de login
-        await _securityService.registrarAtividadeSeguranca(
-          'login_google',
-          'Login com Google realizado: ${result.user!.email}',
-          sucesso: true,
+        await _securityService.logSecurityActivity(
+          'sign_in_google',
+          'User ${user.uid} signed in with Google.',
+          success: true,
         );
       }
-
-      return result;
+      return userCredential;
     } catch (e) {
-      print('Erro ao fazer login com Google: $e');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_login_google',
-        'Erro ao fazer login com Google: $e',
-        sucesso: false,
+      await _securityService.logSecurityActivity(
+        'error_sign_in_google',
+        'Error: ${e.toString()}',
+        success: false,
       );
-      return null;
+      throw Exception('Google Sign-In failed: ${e.toString()}');
     }
   }
 
-  /// Fazer logout
-  Future<void> fazerLogout() async {
+  /// Faz logout
+  Future<void> signOut() async {
     try {
+      await _googleSignIn.signOut(); // Importante se usou login com Google
       await _auth.signOut();
-      await _googleSignIn.signOut();
+      await _securityService.logSecurityActivity(
+        'sign_out',
+        'User signed out.',
+        success: true,
+      );
     } catch (e) {
-      print('Erro ao fazer logout: $e');
-      rethrow;
+      print('Error signing out: $e');
+      // Não lançar erro aqui, apenas registrar se necessário
     }
   }
 
-  /// Reenviar verificação de email
-  Future<void> reenviarVerificacaoEmail() async {
-    final user = _auth.currentUser;
-    if (user != null && !user.emailVerified) {
-      await user.sendEmailVerification();
-    }
-  }
-
-  /// Recuperar senha
-  Future<void> recuperarSenha(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
-  }
-
-  // ========== GETTERS ==========
-
-  /// Usuário atual
-  User? get usuarioAtual => _auth.currentUser;
-
-  /// Verificar se a sessão é válida
-  Future<bool> verificarSessaoValida() async {
-    final user = _auth.currentUser;
-    if (user == null) return false;
-
+  /// Envia e-mail de redefinição de senha
+  Future<void> sendPasswordResetEmail(String email) async {
     try {
-      // Verificar se o usuário ainda existe no banco
-      final snapshot = await _database.ref('usuarios/${user.uid}').get();
-      if (!snapshot.exists) return false;
-
-      final userData = snapshot.value as Map<dynamic, dynamic>;
-      return userData['status'] == 'ativo';
-    } catch (e) {
-      print('Erro ao verificar sessão: $e');
-      return false;
+      await _auth.sendPasswordResetEmail(email: email);
+      await _securityService.logSecurityActivity(
+        'password_reset',
+        'Password reset email sent to $email.',
+        success: true,
+      );
+    } on FirebaseAuthException catch (e) {
+      await _securityService.logSecurityActivity(
+        'error_password_reset',
+        'Error: ${e.message}',
+        success: false,
+      );
+      throw Exception(e.message);
     }
   }
 }
