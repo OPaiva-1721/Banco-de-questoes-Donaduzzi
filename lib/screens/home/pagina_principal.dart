@@ -287,40 +287,40 @@ class TelaInicio extends StatelessWidget {
   }
 
   void _navegarParaCriarProva(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const CriarProvaScreen()),
-    );
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(builder: (context) => const CriarProvaScreen()),
+    // );
   }
 
   void _navegarParaBancoQuestoes(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const BancoQuestoesMenuScreen()),
-    );
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(builder: (context) => const BancoQuestoesMenuScreen()),
+    // );
   }
 
   void _navegarParaProvasGeradas(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
-    );
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
+    // );
   }
 
   void _navegarParaDisciplinas(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const GerenciarDisciplinasScreen(),
-      ),
-    );
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (context) => const GerenciarDisciplinasScreen(),
+    //   ),
+    // );
   }
 
   void _navegarParaCursos(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const GerenciarCursosScreen()),
-    );
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(builder: (context) => const GerenciarCursosScreen()),
+    // );
   }
 
   void _popularDados(BuildContext context) async {
@@ -364,34 +364,34 @@ class TelaInicio extends StatelessWidget {
         ),
       );
 
-      try {
-        await FirebaseDataPopulator.popularTodosDados();
+      // try {
+      //   await FirebaseDataPopulator.popularTodosDados();
 
-        // Fechar loading
-        Navigator.pop(context);
+      //   // Fechar loading
+      //   Navigator.pop(context);
 
-        // Mostrar sucesso
-        MessageUtils.mostrarSucesso(
-          context,
-          'Dados populados com sucesso!\n\n'
-          'Adicionados:\n'
-          '• 5 cursos\n'
-          '• 30 disciplinas',
-        );
-      } catch (e) {
-        // Fechar loading
-        Navigator.pop(context);
+      //   // Mostrar sucesso
+      //   MessageUtils.mostrarSucesso(
+      //     context,
+      //     'Dados populados com sucesso!\n\n'
+      //     'Adicionados:\n'
+      //     '• 5 cursos\n'
+      //     '• 30 disciplinas',
+      //   );
+      // } catch (e) {
+      //   // Fechar loading
+      //   Navigator.pop(context);
 
-        // Mostrar erro
-        MessageUtils.mostrarErro(context, 'Erro ao popular dados: $e');
-      }
+      //   // Mostrar erro
+      //   MessageUtils.mostrarErro(context, 'Erro ao popular dados: $e');
+      // }
     }
   }
 
   // Método para fazer logout
   Future<void> _fazerLogout(BuildContext context) async {
     try {
-      await _firebaseService.fazerLogout();
+      await _firebaseService.signOut();
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const TelaLogin()),
