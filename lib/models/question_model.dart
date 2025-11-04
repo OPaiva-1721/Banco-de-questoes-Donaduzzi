@@ -1,82 +1,74 @@
+// Importe apenas o que você precisa (QuestionDifficulty)
 import 'package:firebase_database/firebase_database.dart';
-import 'package:prova/models/enums.dart';
+import 'package:prova/models/enums.dart'; // Mantenha isso para QuestionDifficulty
 import 'option_model.dart';
 
-// Enum to clearly define the question types
 class Question {
-  final String? id; // The Firebase push-ID (e.g., -Nqg...)
+  final String? id;
   final String questionText;
   final String subjectId;
-  final QuestionType type;
+  // final QuestionType type; // REMOVA ISSO
 
-  // --- New Fields You Requested ---
-  final QuestionDifficulty difficulty; // e.g., easy, medium, hard
-  final bool isActive; // e.g., true (active), false (inactive)
+  final QuestionDifficulty difficulty;
+  final bool isActive;
 
-  // --- Type-Specific Fields ---
-  final List<Option>? options; // Only for multipleChoice
-  final bool? trueFalseAnswer; // Only for trueFalse
-  final int? suggestedLines; // Only for essay
+  // --- Campos Específicos ---
+  final List<Option> options; // MUDE DE List<Option>? PARA List<Option>
+  // final bool? trueFalseAnswer; // REMOVA ISSO
+  // final int? suggestedLines; // REMOVA ISSO
 
-  // --- Metadata Fields ---
+  // --- Campos de Metadados ---
   final String? imageUrl;
   final String? explanation;
-  final String createdBy; // Firebase Auth UID
-  final int createdAt; // Saved as timestamp
+  final String createdBy;
+  final int createdAt;
 
   Question({
     this.id,
     required this.questionText,
     required this.subjectId,
-    required this.type,
+    // required this.type, // REMOVA ISSO
     required this.difficulty,
     required this.createdBy,
     required this.createdAt,
-    this.isActive = true, // Default to active
-    // Type-specific fields are optional
-    this.options,
-    this.trueFalseAnswer,
-    this.suggestedLines,
+    this.isActive = true,
+    required this.options, // MUDE DE this.options PARA required this.options
+    // this.trueFalseAnswer, // REMOVA ISSO
+    // this.suggestedLines, // REMOVA ISSO
     this.imageUrl,
     this.explanation,
   });
 
-  /// Converts the Question object to a Map (JSON) for Firebase.
+  /// Converte o Question para Map (JSON)
   Map<String, dynamic> toJson() {
     return {
       'questionText': questionText,
       'subjectId': subjectId,
-      'type': type.name, // Saves the enum as a string (e.g., 'multipleChoice')
-      'difficulty':
-          difficulty.name, // Saves the enum as a string (e.g., 'easy')
-      'isActive': isActive, // Saves the boolean
+      // 'type': type.name, // REMOVA ISSO
+      'difficulty': difficulty.name,
+      'isActive': isActive,
       'createdBy': createdBy,
       'createdAt': createdAt,
       'imageUrl': imageUrl,
       'explanation': explanation,
 
-      // Save type-specific data only if it's not null
-      'options': options?.map((o) => o.toJson()).toList(),
-      'trueFalseAnswer': trueFalseAnswer,
-      'suggestedLines': suggestedLines,
+      // Mude de 'options?.' para 'options.'
+      'options': options.map((o) => o.toJson()).toList(),
+      // 'trueFalseAnswer': trueFalseAnswer, // REMOVA ISSO
+      // 'suggestedLines': suggestedLines, // REMOVA ISSO
     };
   }
 
-  /// Helper to convert a string (e.g., 'multipleChoice') back to the enum.
+  // REMOVA O MÉTODO _typeFromString INTEIRO
+  /*
   static QuestionType _typeFromString(String? typeString) {
-    switch (typeString) {
-      case 'trueFalse':
-        return QuestionType.trueFalse;
-      case 'essay':
-        return QuestionType.essay;
-      case 'multipleChoice':
-      default:
-        return QuestionType.multipleChoice;
-    }
+    ...
   }
+  */
 
-  /// Helper to convert a string (e.g., 'easy') back to the enum.
+  /// Helper para converter string (e.g., 'easy') de volta para o enum.
   static QuestionDifficulty _difficultyFromString(String? diffString) {
+    // Este método continua igual
     switch (diffString) {
       case 'medium':
         return QuestionDifficulty.medium;
@@ -88,35 +80,38 @@ class Question {
     }
   }
 
-  /// Creates a Question object from a Firebase DataSnapshot.
+  /// Cria um Question a partir de um Firebase DataSnapshot.
   factory Question.fromSnapshot(DataSnapshot snapshot) {
     final data = Map<String, dynamic>.from(snapshot.value as Map);
 
-    // Convert the 'options' list (if it exists) back to List<Option>
-    List<Option>? optionsList;
+    // Converta 'options' para List<Option>
+    // Esta lógica agora deve garantir que a lista não seja nula.
+    List<Option> optionsList;
     if (data['options'] != null) {
       final rawList = data['options'] as List;
       optionsList = rawList
           .map((item) => Option.fromJson(Map<String, dynamic>.from(item)))
           .toList();
+    } else {
+      optionsList = []; // Ou lance um erro se 'options' for sempre esperado
     }
 
     return Question(
       id: snapshot.key,
       questionText: data['questionText'] ?? '',
       subjectId: data['subjectId'] ?? '',
-      type: _typeFromString(data['type']),
+      // type: _typeFromString(data['type']), // REMOVA ISSO
       difficulty: _difficultyFromString(data['difficulty']),
-      isActive: data['isActive'] ?? true, // Default to true if missing
+      isActive: data['isActive'] ?? true,
       createdBy: data['createdBy'] ?? '',
       createdAt: (data['createdAt'] as num?)?.toInt() ?? 0,
       imageUrl: data['imageUrl'],
       explanation: data['explanation'],
 
-      // Read type-specific data
+      // Atribua a lista não nula
       options: optionsList,
-      trueFalseAnswer: data['trueFalseAnswer'],
-      suggestedLines: (data['suggestedLines'] as num?)?.toInt(),
+      // trueFalseAnswer: data['trueFalseAnswer'], // REMOVA ISSO
+      // suggestedLines: (data['suggestedLines'] as num?)?.toInt(), // REMOVA ISSO
     );
   }
 }
