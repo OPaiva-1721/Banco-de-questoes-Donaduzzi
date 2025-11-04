@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "526891742329",
+    "firebase_url": "https://banco-de-questoes-cdc6b-default-rtdb.firebaseio.com",
+    "project_id": "banco-de-questoes-cdc6b",
+    "storage_bucket": "banco-de-questoes-cdc6b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:526891742329:android:bd431afa8102a32cdf10a8",
+        "android_client_info": {
+          "package_name": "com.exemplo.prova"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "526891742329-r7v7ukern6rooeme3i84htdh4887tpke.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.exemplo.prova",
+            "certificate_hash": "d988f749e7116be144efc2a5861ecd16430e126b"
+          }
+        },
+        {
+          "client_id": "526891742329-b7fiivsj2a6dihd0bhddkt31a6qt9ocu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCz1pfdeh9b6ojB7BHmNnIKjzvw1WMlcDc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "526891742329-b7fiivsj2a6dihd0bhddkt31a6qt9ocu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

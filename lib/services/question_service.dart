@@ -1,9 +1,9 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'security_service.dart';
-import '../models/question_model.dart'; // Importa o modelo atualizado (com enums)
+import '../models/question_model.dart'; // Importa o modelo atualizado (sem QuestionType)
 import '../models/option_model.dart';
-import '../models/enums.dart'; // Importa os enums
+import '../models/enums.dart'; // Importa apenas QuestionDifficulty
 
 import 'dart:async';
 
@@ -21,87 +21,75 @@ class QuestionService {
     _examsRef = _database.ref('exams');
   }
 
-  /// Private helper to run type-specific validation.
+  /// Helper privado para validar a questão (agora simplificado).
   void _validateQuestion(Question question) {
-    switch (question.type) {
-      case QuestionType.multipleChoice:
-        if (question.options == null ||
-            question.options!.length < 2 ||
-            question.options!.length > 5) {
-          throw Exception(
-            'Multiple choice questions must have between 2 and 5 options.',
-          );
-        }
-        bool hasCorrect = question.options!.any(
-          (option) => option.isCorrect == true,
-        );
-        if (!hasCorrect) {
-          throw Exception('At least one option must be marked as correct.');
-        }
-        for (var option in question.options!) {
-          if (!_securityService.validateText(option.text, maxLength: 500)) {
-            throw Exception('Invalid option text.');
-          }
-          if (!_securityService.validateText(option.letter, maxLength: 1)) {
-            throw Exception('Invalid option letter.');
-          }
-        }
-        break;
+    // 1. Validar se tem exatamente 5 opções
+    if (question.options.length != 5) {
+      throw Exception('As questões devem ter exatamente 5 opções.');
+    }
 
-      case QuestionType.trueFalse:
-        if (question.trueFalseAnswer == null) {
-          throw Exception('A True/False answer must be provided.');
-        }
-        break;
+    // 2. Validar se *exatamente UMA* opção está correta
+    final correctCount = question.options
+        .where((option) => option.isCorrect)
+        .length;
+    if (correctCount != 1) {
+      throw Exception('Exatamente uma opção deve ser marcada como correta.');
+    }
 
-      case QuestionType.essay:
-        // No specific validation needed.
-        break;
+    // 3. Validar o texto das opções
+    for (var option in question.options) {
+      if (!_securityService.validateText(option.text, maxLength: 500)) {
+        throw Exception('Texto da opção inválido.');
+      }
+      // Você pode manter a validação da letra se ela ainda for usada (ex: A, B, C, D, E)
+      if (!_securityService.validateText(option.letter, maxLength: 1)) {
+        throw Exception('Letra da opção inválida.');
+      }
     }
   }
 
-  /// Creates a new question in the database.
+  /// Cria uma nova questão no banco de dados.
   Future<String?> createQuestion(Question newQuestion) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return null;
 
     try {
-      // 1. General Validation
+      // 1. Validação Geral
       if (!_securityService.validateText(
         newQuestion.questionText,
         maxLength: 1000,
       )) {
-        throw Exception('Invalid question statement.');
+        throw Exception('Enunciado da questão inválido.');
       }
       if (newQuestion.explanation != null &&
           !_securityService.validateText(
             newQuestion.explanation,
             maxLength: 1000,
           )) {
-        throw Exception('Invalid explanation text.');
+        throw Exception('Texto da explicação inválido.');
       }
 
-      // 2. External Validation: Check if subject exists
+      // 2. Validação Externa: Checar se a disciplina existe
       final subjectSnapshot = await _subjectsRef
           .child(newQuestion.subjectId)
           .get();
       if (!subjectSnapshot.exists) {
-        throw Exception('Subject not found.');
+        throw Exception('Disciplina não encontrada.');
       }
 
-      // 3. Type-Specific Validation
+      // 3. Validação Específica (agora simplificada)
       _validateQuestion(newQuestion);
 
-      // 4. Save to Firebase
+      // 4. Salvar no Firebase
       final newQuestionRef = _questionsRef.push();
 
-      // The model's toJson() method now automatically handles
-      // 'difficulty' and 'isActive'. No change needed here.
+      // O toJson() do modelo já foi atualizado para não incluir 'type'
       await newQuestionRef.set(newQuestion.toJson());
 
+      // Log de segurança atualizado (sem .type.name)
       await _securityService.logSecurityActivity(
         'create_question',
-        'Question (${newQuestion.type.name}) created.',
+        'Question created.', // Anteriormente: 'Question (${newQuestion.type.name}) created.'
         success: true,
       );
       return newQuestionRef.key;
@@ -115,20 +103,24 @@ class QuestionService {
     }
   }
 
-  /// Returns a Stream of the list of Question objects.
+  /// Retorna um Stream da lista de objetos Question.
   Stream<List<Question>> getQuestionsStream() {
     return _questionsRef.onValue.map((event) {
       final questionsList = <Question>[];
       if (event.snapshot.exists && event.snapshot.value != null) {
-        for (final childSnapshot in event.snapshot.children) {
-          questionsList.add(Question.fromSnapshot(childSnapshot));
+        // Garantir que o snapshot é um Map
+        final data = event.snapshot.value;
+        if (data is Map) {
+          for (final childSnapshot in event.snapshot.children) {
+            questionsList.add(Question.fromSnapshot(childSnapshot));
+          }
         }
       }
       return questionsList;
     });
   }
 
-  /// Returns a Stream of Question objects filtered by subjectId.
+  /// Retorna um Stream de objetos Question filtrados por subjectId.
   Stream<List<Question>> getQuestionsBySubjectStream(String subjectId) {
     final query = _questionsRef.orderByChild('subjectId').equalTo(subjectId);
 
@@ -143,7 +135,7 @@ class QuestionService {
     });
   }
 
-  /// Fetches a single Question object by its ID.
+  /// Busca um único objeto Question pelo seu ID.
   Future<Question?> getQuestion(String questionId) async {
     try {
       final snapshot = await _questionsRef.child(questionId).get();
@@ -157,17 +149,19 @@ class QuestionService {
     }
   }
 
-  /// Updates an existing question.
+  /// Atualiza uma questão existente.
   Future<bool> updateQuestion(Question updatedQuestion) async {
     if (updatedQuestion.id == null) {
-      throw Exception('Question ID cannot be null for an update.');
+      throw Exception('ID da questão não pode ser nulo para uma atualização.');
     }
 
     try {
+      // Usa a nova validação simplificada
       _validateQuestion(updatedQuestion);
 
       final updateData = updatedQuestion.toJson();
-      updateData['lastUpdatedAt'] = ServerValue.timestamp;
+      updateData['lastUpdatedAt'] =
+          ServerValue.timestamp; // Opcional: adicionar timestamp de atualização
 
       await _questionsRef.child(updatedQuestion.id!).update(updateData);
 
@@ -187,10 +181,10 @@ class QuestionService {
     }
   }
 
-  /// Deletes a question, checking for exam dependencies first.
+  /// Deleta uma questão, checando dependências em provas primeiro.
   Future<bool> deleteQuestion(String questionId) async {
     try {
-      // 1. Check if the question is used in any exams
+      // 1. Checar se a questão está sendo usada em alguma prova
       final examsSnapshot = await _examsRef.get();
 
       if (examsSnapshot.exists && examsSnapshot.value != null) {
@@ -204,13 +198,15 @@ class QuestionService {
               examData['questions'],
             );
             if (questionsInExam.containsKey(questionId)) {
-              throw Exception('Cannot delete: Question is used in an exam.');
+              throw Exception(
+                'Não pode deletar: Questão está em uso em uma prova.',
+              );
             }
           }
         }
       }
 
-      // 2. If not used, delete the question
+      // 2. Se não estiver em uso, deletar a questão
       await _questionsRef.child(questionId).remove();
 
       await _securityService.logSecurityActivity(

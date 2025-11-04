@@ -82,7 +82,6 @@ coverage/
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 
 # Firebase
-**/google-services.json
 **/GoogleService-Info.plist
 
 # Local configuration files
