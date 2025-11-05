@@ -1,0 +1,135 @@
+name: iOS-ipa-build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    name: 🎉 iOS Build
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          architecture: x64
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Setup CocoaPods
+        timeout-minutes: 15
+        run: |
+          cd ios
+          echo "🔍 Checking CocoaPods version..."
+          pod --version
+          echo "📦 Updating CocoaPods repo..."
+          pod repo update --verbose || echo "⚠️ pod repo update had issues, continuing anyway..."
+          echo "📥 Installing pods..."
+          pod install --repo-update --verbose
+          echo "✅ Pod install completed!"
+
+      - name: Configure Xcode for no-code signing
+        run: |
+          cd ios
+          python3 << 'EOF'
+          import re
+          
+          # Read the project file
+          with open('Runner.xcodeproj/project.pbxproj', 'r') as f:
+              content = f.read()
+          
+          # Disable code signing completely
+          replacements = [
+              (r'DEVELOPMENT_TEAM = [^;]+;', 'DEVELOPMENT_TEAM = "";'),
+              (r'CODE_SIGN_IDENTITY = "[^"]+";', 'CODE_SIGN_IDENTITY = "";'),
+              (r'"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "[^"]+";', '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";'),
+              (r'CODE_SIGN_STYLE = Automatic;', 'CODE_SIGN_STYLE = Manual;'),
+              (r'ProvisioningStyle = Automatic;', 'ProvisioningStyle = Manual;'),
+              (r'CODE_SIGNING_REQUIRED = YES;', 'CODE_SIGNING_REQUIRED = NO;'),
+              (r'CODE_SIGNING_ALLOWED = YES;', 'CODE_SIGNING_ALLOWED = NO;'),
+          ]
+          
+          for pattern, replacement in replacements:
+              content = re.sub(pattern, replacement, content)
+          
+          # Write back
+          with open('Runner.xcodeproj/project.pbxproj', 'w') as f:
+              f.write(content)
+          
+          print("✅ Code signing disabled in Xcode project")
+          EOF
+
+      - name: Build iOS with xcodebuild directly
+        timeout-minutes: 30
+        run: |
+          cd ios
+          echo "🧹 Cleaning previous build..."
+          xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -quiet || true
+          
+          echo "🔨 Building iOS app without code signing..."
+          xcodebuild build \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            PROVISIONING_PROFILE="" \
+            ONLY_ACTIVE_ARCH=NO \
+            -quiet
+            
+          echo "📦 Copying build output..."
+          mkdir -p ../build/ios/iphoneos
+          if [ -d "build/Release-iphoneos/Runner.app" ]; then
+            cp -R build/Release-iphoneos/Runner.app ../build/ios/iphoneos/Runner.app
+            echo "✅ Build completed successfully!"
+          else
+            echo "❌ Build output not found, trying alternative location..."
+            find . -name "Runner.app" -type d | head -1 | xargs -I {} cp -R {} ../build/ios/iphoneos/Runner.app || exit 1
+          fi
+
+      - name: Create Payload directory
+        run: mkdir -p Payload
+        working-directory: build/ios/iphoneos
+
+      - name: Move Runner.app to Payload
+        run: mv Runner.app Payload/
+        working-directory: build/ios/iphoneos
+
+      - name: Create IPA file
+        run: zip -qq -r -9 FlutterIpaExport.ipa Payload
+        working-directory: build/ios/iphoneos
+
+      - name: Upload to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/ios/iphoneos/FlutterIpaExport.ipa
+          tag: v1.0
+          overwrite: true
+          body: "This is first release"
