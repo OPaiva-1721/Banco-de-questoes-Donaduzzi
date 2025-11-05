@@ -85,44 +85,67 @@ jobs:
         run: |
           cd ios
           echo "🧹 Cleaning previous build..."
-          xcodebuild clean -workspace Runner.xcworkspace -scheme Runner -quiet || true
+          xcodebuild clean -workspace Runner.xcworkspace -scheme Runner || true
           
           echo "🔨 Building iOS app without code signing..."
+          # Build with explicit derivedDataPath to control output location
           xcodebuild build \
             -workspace Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
+            -derivedDataPath ./build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE="" \
-            ONLY_ACTIVE_ARCH=NO \
-            -quiet
+            ONLY_ACTIVE_ARCH=NO
             
-          echo "📦 Copying build output..."
+          echo "📦 Searching for build output..."
           mkdir -p ../build/ios/iphoneos
-          if [ -d "build/Release-iphoneos/Runner.app" ]; then
+          
+          # Try multiple possible locations
+          RUNNER_APP=""
+          
+          # Check in explicit build directory
+          if [ -d "build/Build/Products/Release-iphoneos/Runner.app" ]; then
+            RUNNER_APP="build/Build/Products/Release-iphoneos/Runner.app"
+            echo "✅ Found Runner.app in build/Build/Products/Release-iphoneos/"
+          elif [ -d "build/Release-iphoneos/Runner.app" ]; then
+            RUNNER_APP="build/Release-iphoneos/Runner.app"
             echo "✅ Found Runner.app in build/Release-iphoneos/"
-            cp -R build/Release-iphoneos/Runner.app ../build/ios/iphoneos/Runner.app
-            echo "✅ Build completed successfully!"
           else
-            echo "⚠️ Build output not found in build/Release-iphoneos/, searching..."
-            RUNNER_APP=$(find . -name "Runner.app" -type d | head -1)
-            if [ -n "$RUNNER_APP" ]; then
-              echo "✅ Found Runner.app at: $RUNNER_APP"
-              cp -R "$RUNNER_APP" ../build/ios/iphoneos/Runner.app
-              echo "✅ Build copied successfully!"
+            echo "⚠️ Searching in DerivedData..."
+            # Search in DerivedData (default location)
+            DERIVED_DATA=$(find ~/Library/Developer/Xcode/DerivedData -name "Runner.app" -type d -path "*/Build/Products/Release-iphoneos/*" 2>/dev/null | head -1)
+            if [ -n "$DERIVED_DATA" ]; then
+              RUNNER_APP="$DERIVED_DATA"
+              echo "✅ Found Runner.app in DerivedData: $DERIVED_DATA"
             else
-              echo "❌ Runner.app not found anywhere!"
-              echo "📂 Listing build directory:"
-              ls -la build/ || true
-              exit 1
+              echo "⚠️ Searching in current directory..."
+              # Search anywhere in ios directory
+              RUNNER_APP=$(find . -name "Runner.app" -type d | head -1)
+              if [ -n "$RUNNER_APP" ]; then
+                echo "✅ Found Runner.app at: $RUNNER_APP"
+              fi
             fi
           fi
+          
+          if [ -z "$RUNNER_APP" ] || [ ! -d "$RUNNER_APP" ]; then
+            echo "❌ Runner.app not found anywhere!"
+            echo "📂 Listing build directory:"
+            ls -la build/ || true
+            echo "📂 Searching for any .app files:"
+            find . -name "*.app" -type d 2>/dev/null | head -10 || true
+            exit 1
+          fi
+          
+          echo "📋 Copying Runner.app from: $RUNNER_APP"
+          cp -R "$RUNNER_APP" ../build/ios/iphoneos/Runner.app
+          echo "✅ Build copied successfully!"
           echo "🔍 Verifying copied file..."
           ls -la ../build/ios/iphoneos/Runner.app || exit 1
 
