@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:prova/screens/professor/banco_questoes/banco_questoes_menu_screen.dart';
+import 'package:prova/screens/professor/cursos/gerenciar_cursos_screen.dart';
 import '../../utils/message_utils.dart';
-import '../../utils/firebase_data_populator.dart';
 import '../../services/firebase_service.dart';
 import '../auth/tela_login.dart';
-import '../professor/criar_prova/criar_prova_screen.dart';
-import '../professor/banco_questoes/banco_questoes_menu_screen.dart';
-import '../professor/provas_geradas_screen.dart';
-import '../professor/disciplinas/gerenciar_disciplinas_screen.dart';
-import '../professor/cursos/gerenciar_cursos_screen.dart';
 
 class TelaInicio extends StatelessWidget {
   const TelaInicio({super.key});
@@ -294,10 +290,10 @@ class TelaInicio extends StatelessWidget {
   }
 
   void _navegarParaBancoQuestoes(BuildContext context) {
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(builder: (context) => const BancoQuestoesMenuScreen()),
-    // );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const BancoQuestoesMenuScreen()),
+    );
   }
 
   void _navegarParaProvasGeradas(BuildContext context) {
@@ -317,10 +313,10 @@ class TelaInicio extends StatelessWidget {
   }
 
   void _navegarParaCursos(BuildContext context) {
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(builder: (context) => const GerenciarCursosScreen()),
-    // );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const GerenciarCursosScreen()),
+    );
   }
 
   void _popularDados(BuildContext context) async {

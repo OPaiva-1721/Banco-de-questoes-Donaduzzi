@@ -114,7 +114,7 @@ class FirebaseService {
   // ========== COURSES (Delegation to CourseService) ==========
   // (Esta parte permanece igual)
   Future<String?> createCourse(String name, String description) {
-    return _courseService.createCourse(name, description);
+    return _courseService.createCourse(name);
   }
 
   Stream<DatabaseEvent> getCoursesStream() {

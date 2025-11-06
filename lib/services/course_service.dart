@@ -13,27 +13,23 @@ class CourseService {
     _coursesRef = _database.ref('courses');
   }
 
-  Future<String?> createCourse(String name, String description) async {
+  /// Esta é a sua função 'createCourse' (correta, só com 'name')
+  Future<String?> createCourse(String name) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return null;
 
     if (!_securityService.validateText(name, maxLength: 100)) {
       throw Exception('Invalid course name.');
     }
-    if (!_securityService.validateText(description, maxLength: 500)) {
-      throw Exception('Invalid course description.');
-    }
 
     final sanitizedName = _securityService.sanitizeInput(name);
-    final sanitizedDesc = _securityService.sanitizeInput(description);
 
     try {
       final courseData = {
         'name': sanitizedName,
-        'description': sanitizedDesc,
         'createdAt': ServerValue.timestamp,
         'createdBy': userId,
-        'status': 'active', // Using string 'status' here
+        // REMOVIDO: 'description' e 'status' não estão no seu modelo
       };
 
       final newCourseRef = _coursesRef.push();
@@ -68,21 +64,19 @@ class CourseService {
     }
   }
 
-  Future<bool> updateCourse(
-    String courseId,
-    Map<String, dynamic> updateData,
-  ) async {
-    if (updateData.containsKey('name')) {
-      if (!_securityService.validateText(updateData['name'])) {
-        throw Exception('Invalid course name.');
-      }
-      updateData['name'] = _securityService.sanitizeInput(updateData['name']);
+  /// MUDANÇA: Simplificado para atualizar APENAS o 'name',
+  /// que é o único campo editável no seu model.
+  Future<bool> updateCourse(String courseId, String newName) async {
+    if (!_securityService.validateText(newName, maxLength: 100)) {
+      throw Exception('Invalid course name.');
     }
-    // ... (add validation for other fields if needed) ...
+    final sanitizedName = _securityService.sanitizeInput(newName);
 
     try {
-      updateData['lastUpdatedAt'] = ServerValue.timestamp;
-      await _coursesRef.child(courseId).update(updateData);
+      await _coursesRef.child(courseId).update({
+        'name': sanitizedName,
+        'lastUpdatedAt': ServerValue.timestamp,
+      });
 
       await _securityService.logSecurityActivity(
         'update_course',
@@ -100,17 +94,16 @@ class CourseService {
     }
   }
 
-  /// Soft deletes the course by setting its status to 'inactive'.
+  /// MUDANÇA: Alterado de 'soft delete' (status) para 'hard delete' (remove)
+  /// Conforme solicitado.
   Future<bool> deleteCourse(String courseId) async {
     try {
-      await _coursesRef.child(courseId).update({
-        'status': 'inactive',
-        'deletedAt': ServerValue.timestamp,
-      });
+      // Deleta o curso permanentemente
+      await _coursesRef.child(courseId).remove();
 
       await _securityService.logSecurityActivity(
         'delete_course',
-        'Course $courseId deactivated',
+        'Course $courseId deleted', // 'deleted' em vez de 'deactivated'
         success: true,
       );
       return true;

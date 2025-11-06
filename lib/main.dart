@@ -11,7 +11,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // --- INÍCIO DA CORREÇÃO ---
+    // --- ESTA É A PARTE IMPORTANTE ---
     // Verifica se já existe uma instância default do Firebase
     if (Firebase.apps.isEmpty) {
       // Se não houver, inicializa uma nova
@@ -23,7 +23,7 @@ void main() async {
       // Se já existir, apenas informa
       print('Firebase já inicializado');
     }
-    // --- FIM DA CORREÇÃO ---
+    // --- FIM DA PARTE IMPORTANTE ---
   } catch (e) {
     print('Erro ao inicializar Firebase: $e');
   }
