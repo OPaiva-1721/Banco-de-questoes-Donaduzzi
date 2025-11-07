@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:prova/screens/professor/banco_questoes/banco_questoes_menu_screen.dart';
 import 'package:prova/screens/professor/cursos/gerenciar_cursos_screen.dart';
+import 'package:prova/screens/professor/disciplinas/gerenciar_disciplinas_screen.dart';
 import '../../utils/message_utils.dart';
 import '../../services/firebase_service.dart';
 import '../auth/tela_login.dart';
@@ -304,12 +305,12 @@ class TelaInicio extends StatelessWidget {
   }
 
   void _navegarParaDisciplinas(BuildContext context) {
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => const GerenciarDisciplinasScreen(),
-    //   ),
-    // );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const GerenciarDisciplinasScreen(),
+      ),
+    );
   }
 
   void _navegarParaCursos(BuildContext context) {
