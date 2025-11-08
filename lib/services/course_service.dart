@@ -13,24 +13,19 @@ class CourseService {
     _coursesRef = _database.ref('courses');
   }
 
-  Future<String?> createCourse(String name, String description) async {
+  Future<String?> createCourse(String name) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return null;
 
     if (!_securityService.validateText(name, maxLength: 100)) {
       throw Exception('Invalid course name.');
     }
-    if (!_securityService.validateText(description, maxLength: 500)) {
-      throw Exception('Invalid course description.');
-    }
 
     final sanitizedName = _securityService.sanitizeInput(name);
-    final sanitizedDesc = _securityService.sanitizeInput(description);
 
     try {
       final courseData = {
         'name': sanitizedName,
-        'description': sanitizedDesc,
         'createdAt': ServerValue.timestamp,
         'createdBy': userId,
         'status': 'active', // Using string 'status' here
