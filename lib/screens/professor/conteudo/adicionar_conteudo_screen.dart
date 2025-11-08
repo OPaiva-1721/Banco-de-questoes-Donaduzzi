@@ -1,48 +1,49 @@
 import 'package:flutter/material.dart';
-import '../../../services/subject_service.dart';
+import '../../../services/content_service.dart';
 import '../../../utils/message_utils.dart';
 
-class AdicionarDisciplinaScreen extends StatefulWidget {
-  const AdicionarDisciplinaScreen({super.key});
+class AdicionarConteudoScreen extends StatefulWidget {
+  final String disciplinaId;
+
+  const AdicionarConteudoScreen({super.key, required this.disciplinaId});
 
   @override
-  State<AdicionarDisciplinaScreen> createState() =>
-      _AdicionarDisciplinaScreenState();
+  State<AdicionarConteudoScreen> createState() =>
+      _AdicionarConteudoScreenState();
 }
 
-class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
+class _AdicionarConteudoScreenState extends State<AdicionarConteudoScreen> {
   static const Color _primaryColor = Color(0xFF541822);
   static const Color _backgroundColor = Color(0xFFF5F5F5);
   static const Color _textColor = Color(0xFF333333);
   static const Color _whiteColor = Colors.white;
 
-  final SubjectService _subjectService = SubjectService();
+  final ContentService _contentService = ContentService();
 
-  late final TextEditingController _nomeController;
-  int _semestreSelecionado = 1;
+  late final TextEditingController _descricaoController;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _nomeController = TextEditingController();
+    _descricaoController = TextEditingController();
   }
 
   @override
   void dispose() {
-    _nomeController.dispose();
+    _descricaoController.dispose();
     super.dispose();
   }
 
   bool _validarFormulario() {
-    if (_nomeController.text.trim().isEmpty) {
-      MessageUtils.mostrarErro(context, 'Digite o nome da disciplina');
+    if (_descricaoController.text.trim().isEmpty) {
+      MessageUtils.mostrarErro(context, 'Digite a descrição do conteúdo');
       return false;
     }
     return true;
   }
 
-  Future<void> _salvarDisciplina() async {
+  Future<void> _salvarConteudo() async {
     if (!_validarFormulario()) return;
 
     setState(() {
@@ -50,25 +51,22 @@ class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
     });
 
     try {
-      final disciplinaId = await _subjectService.createSubject(
-        _nomeController.text.trim(),
-        _semestreSelecionado,
+      final conteudoId = await _contentService.createContent(
+        description: _descricaoController.text.trim(),
+        subjectId: widget.disciplinaId,
       );
 
       if (mounted) {
-        if (disciplinaId != null) {
-          MessageUtils.mostrarSucesso(
-            context,
-            'Disciplina criada com sucesso!',
-          );
+        if (conteudoId != null) {
+          MessageUtils.mostrarSucesso(context, 'Conteúdo criado com sucesso!');
           Navigator.pop(context, true);
         } else {
-          MessageUtils.mostrarErro(context, 'Erro ao criar disciplina');
+          MessageUtils.mostrarErro(context, 'Erro ao criar conteúdo');
         }
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao criar disciplina: $e');
+        MessageUtils.mostrarErro(context, 'Erro ao criar conteúdo: $e');
       }
     } finally {
       if (mounted) {
@@ -104,7 +102,7 @@ class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: const Text('Nova Disciplina'),
+        title: const Text('Novo Conteúdo'),
         backgroundColor: _primaryColor,
         elevation: 0,
         foregroundColor: _whiteColor,
@@ -119,7 +117,7 @@ class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Nome da Disciplina',
+                    'Descrição do Conteúdo',
                     style: TextStyle(
                       color: _textColor,
                       fontSize: 16,
@@ -128,63 +126,24 @@ class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
                   ),
                   const SizedBox(height: 10),
                   TextField(
-                    controller: _nomeController,
+                    controller: _descricaoController,
+                    maxLines: 5,
                     decoration: InputDecoration(
-                      hintText: 'Ex: Matemática, Português, etc.',
+                      hintText:
+                          'Ex: Introdução à álgebra linear, Vetores e matrizes...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                       filled: true,
                       fillColor: Colors.grey[100],
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildContainer(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Semestre',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<int>(
-                    value: _semestreSelecionado,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                    ),
-                    items: List.generate(
-                      10,
-                      (index) => DropdownMenuItem(
-                        value: index + 1,
-                        child: Text('${index + 1}º Semestre'),
-                      ),
-                    ),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _semestreSelecionado = value;
-                        });
-                      }
-                    },
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: _isLoading ? null : _salvarDisciplina,
+              onPressed: _isLoading ? null : _salvarConteudo,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryColor,
                 foregroundColor: _whiteColor,
@@ -203,7 +162,7 @@ class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
                       ),
                     )
                   : const Text(
-                      'Salvar Disciplina',
+                      'Salvar Conteúdo',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

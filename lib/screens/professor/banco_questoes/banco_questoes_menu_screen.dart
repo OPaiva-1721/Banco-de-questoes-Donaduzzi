@@ -1,621 +1,639 @@
-// import 'package:flutter/material.dart';
-// import '../../../services/question_service.dart';
-// import '../../../services/discipline_service.dart';
-// import '../../../utils/message_utils.dart';
-// import 'adicionar_questao_screen.dart';
-// import 'editar_questao_screen.dart';
+import 'package:flutter/material.dart';
+import '../../../models/question_model.dart';
+import '../../../models/discipline_model.dart';
+import '../../../models/content_model.dart';
+import '../../../services/question_service.dart';
+import '../../../services/subject_service.dart';
+import '../../../services/content_service.dart';
+import '../../../utils/message_utils.dart';
+import 'adicionar_questao_screen.dart';
+import 'editar_questao_screen.dart';
 
-// class BancoQuestoesMenuScreen extends StatefulWidget {
-//   const BancoQuestoesMenuScreen({super.key});
+class GerenciarQuestoesScreen extends StatefulWidget {
+  const GerenciarQuestoesScreen({super.key});
 
-//   @override
-//   State<BancoQuestoesMenuScreen> createState() =>
-//       _BancoQuestoesMenuScreenState();
-// }
+  @override
+  State<GerenciarQuestoesScreen> createState() =>
+      _GerenciarQuestoesScreenState();
+}
 
-// class _BancoQuestoesMenuScreenState extends State<BancoQuestoesMenuScreen> {
-//   // Constantes de cores
-//   static const Color _primaryColor = Color(0xFF541822);
-//   static const Color _backgroundColor = Color(0xFFF5F5F5);
-//   static const Color _textColor = Color(0xFF333333);
-//   static const Color _whiteColor = Colors.white;
+class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
+  static const Color _primaryColor = Color(0xFF541822);
+  static const Color _backgroundColor = Color(0xFFF5F5F5);
+  static const Color _textColor = Color(0xFF333333);
+  static const Color _whiteColor = Colors.white;
 
-//   // Serviços
-//   final QuestionService _questionService = QuestionService();
-//   final DisciplineService _disciplineService = DisciplineService();
+  final QuestionService _questionService = QuestionService();
+  final SubjectService _subjectService = SubjectService();
+  final ContentService _contentService = ContentService();
 
-//   // Estados
-//   List<Map<String, dynamic>> _questoes = [];
-//   List<Map<String, dynamic>> _disciplinas = [];
-//   bool _isLoading = true;
-//   String? _disciplinaFiltro;
-//   String _dificuldadeFiltro = 'todas';
+  List<Question> _questoes = [];
+  List<Discipline> _disciplinas = [];
+  List<Content> _conteudos = [];
+  String? _disciplinaFiltro;
+  String? _conteudoFiltro;
+  String _dificuldadeFiltro = 'todas';
+  bool _isLoading = true;
 
-//   @override
-//   void initState() {
-//     super.initState();
-//     _carregarDados();
-//   }
+  @override
+  void initState() {
+    super.initState();
+    _carregarDados();
+  }
 
-//   /// Carrega questões e disciplinas do Firebase
-//   Future<void> _carregarDados() async {
-//     setState(() {
-//       _isLoading = true;
-//     });
+  Future<void> _carregarDados() async {
+    setState(() {
+      _isLoading = true;
+    });
 
-//     try {
-//       // Carregar disciplinas e questões em paralelo
-//       await Future.wait([_carregarDisciplinas(), _carregarQuestoes()]);
-//     } catch (e) {
-//       print('Erro ao carregar dados: $e');
-//       if (mounted) {
-//         MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
-//       }
-//     } finally {
-//       if (mounted) {
-//         setState(() {
-//           _isLoading = false;
-//         });
-//       }
-//     }
-//   }
+    try {
+      await Future.wait([_carregarDisciplinas(), _carregarQuestoes()]);
+    } catch (e) {
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
-//   /// Carrega disciplinas do Firebase
-//   Future<void> _carregarDisciplinas() async {
-//     try {
-//       final stream = _disciplineService.listarDisciplinas();
-//       final event = await stream.first;
+  Future<void> _carregarDisciplinas() async {
+    try {
+      final event = await _subjectService.listarDisciplinas().first;
 
-//       if (event.snapshot.exists) {
-//         final disciplinas = <Map<String, dynamic>>[];
-//         for (final child in event.snapshot.children) {
-//           final disciplina = {
-//             'id': child.key,
-//             ...Map<String, dynamic>.from(child.value as Map),
-//           };
-//           disciplinas.add(disciplina);
-//         }
-//         if (mounted) {
-//           setState(() {
-//             _disciplinas = disciplinas;
-//           });
-//         }
-//       }
-//     } catch (e) {
-//       print('Erro ao carregar disciplinas: $e');
-//       if (mounted) {
-//         MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
-//       }
-//     }
-//   }
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        final disciplinas = <Discipline>[];
+        for (final child in event.snapshot.children) {
+          disciplinas.add(Discipline.fromSnapshot(child));
+        }
+        if (mounted) {
+          setState(() {
+            _disciplinas = disciplinas;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
+      }
+    }
+  }
 
-//   /// Carrega questões do Firebase
-//   Future<void> _carregarQuestoes() async {
-//     try {
-//       final stream = _questionService.listarQuestoes();
-//       final event = await stream.first;
+  Future<void> _carregarConteudos(String? disciplinaId) async {
+    if (disciplinaId == null) {
+      setState(() {
+        _conteudos = [];
+        _conteudoFiltro = null;
+      });
+      return;
+    }
 
-//       if (event.snapshot.exists) {
-//         final questoes = <Map<String, dynamic>>[];
-//         for (final child in event.snapshot.children) {
-//           final questao = {
-//             'id': child.key,
-//             ...Map<String, dynamic>.from(child.value as Map),
-//           };
-//           questoes.add(questao);
-//         }
-//         if (mounted) {
-//           setState(() {
-//             _questoes = questoes;
-//           });
-//         }
-//       }
-//     } catch (e) {
-//       print('Erro ao carregar questões: $e');
-//       if (mounted) {
-//         MessageUtils.mostrarErro(context, 'Erro ao carregar questões: $e');
-//       }
-//     }
-//   }
+    try {
+      final conteudos = await _contentService
+          .getContentBySubjectStream(disciplinaId)
+          .first;
 
-//   /// Filtra questões baseado nos filtros selecionados
-//   List<Map<String, dynamic>> _getQuestoesFiltradas() {
-//     return _questoes.where((questao) {
-//       // Filtro por disciplina
-//       if (_disciplinaFiltro != null &&
-//           questao['disciplinaId'] != _disciplinaFiltro) {
-//         return false;
-//       }
+      if (mounted) {
+        setState(() {
+          _conteudos = conteudos;
+          _conteudoFiltro = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao carregar conteúdos: $e');
+      }
+    }
+  }
 
-//       // Filtro por dificuldade
-//       if (_dificuldadeFiltro != 'todas' &&
-//           questao['dificuldade'] != _dificuldadeFiltro) {
-//         return false;
-//       }
+  Future<void> _carregarQuestoes() async {
+    try {
+      final questoes = await _questionService.getQuestionsStream().first;
 
-//       return true;
-//     }).toList();
-//   }
+      if (mounted) {
+        setState(() {
+          _questoes = questoes;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao carregar questões: $e');
+      }
+    }
+  }
 
-//   /// Obtém o nome da disciplina pelo ID
-//   String _getNomeDisciplina(String? disciplinaId) {
-//     if (disciplinaId == null) return 'Disciplina não encontrada';
+  List<Question> _getQuestoesFiltradas() {
+    return _questoes.where((questao) {
+      if (_disciplinaFiltro != null && questao.subjectId != _disciplinaFiltro) {
+        return false;
+      }
 
-//     final disciplina = _disciplinas.firstWhere(
-//       (d) => d['id'] == disciplinaId,
-//       orElse: () => {'nome': 'Disciplina não encontrada'},
-//     );
+      if (_conteudoFiltro != null && questao.contentId != _conteudoFiltro) {
+        return false;
+      }
 
-//     return disciplina['nome'] ?? 'Disciplina não encontrada';
-//   }
+      if (_dificuldadeFiltro != 'todas' &&
+          questao.difficulty.name != _dificuldadeFiltro) {
+        return false;
+      }
 
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: _backgroundColor,
-//       body: Column(
-//         children: [
-//           // Header com logo e botão voltar
-//           Container(
-//             width: double.infinity,
-//             height: 100,
-//             decoration: const BoxDecoration(
-//               color: _primaryColor,
-//               boxShadow: [
-//                 BoxShadow(
-//                   color: Colors.black26,
-//                   offset: Offset(0, 8),
-//                   blurRadius: 8,
-//                 ),
-//               ],
-//             ),
-//             child: Stack(
-//               children: [
-//                 // Logo centralizado
-//                 Center(
-//                   child: Image.asset(
-//                     'assets/images/logo.png',
-//                     width: 196,
-//                     height: 67,
-//                     fit: BoxFit.contain,
-//                     errorBuilder: (context, error, stackTrace) {
-//                       return Container(
-//                         width: 196,
-//                         height: 67,
-//                         decoration: BoxDecoration(
-//                           color: _whiteColor,
-//                           borderRadius: BorderRadius.circular(8),
-//                         ),
-//                         child: const Center(
-//                           child: Text(
-//                             'LOGO',
-//                             style: TextStyle(
-//                               fontSize: 18,
-//                               fontWeight: FontWeight.bold,
-//                               color: _primaryColor,
-//                             ),
-//                           ),
-//                         ),
-//                       );
-//                     },
-//                   ),
-//                 ),
-//                 // Botão voltar
-//                 Positioned(
-//                   left: 16,
-//                   top: 0,
-//                   bottom: 0,
-//                   child: Center(
-//                     child: IconButton(
-//                       onPressed: () => Navigator.pop(context),
-//                       icon: const Icon(
-//                         Icons.arrow_back,
-//                         color: _whiteColor,
-//                         size: 28,
-//                       ),
-//                       tooltip: 'Voltar',
-//                       style: IconButton.styleFrom(
-//                         backgroundColor: _primaryColor,
-//                         shape: const CircleBorder(),
-//                       ),
-//                     ),
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           // Conteúdo principal
-//           Expanded(
-//             child: Column(
-//               children: [
-//                 // Título e botão na mesma linha
-//                 Padding(
-//                   padding: const EdgeInsets.all(16),
-//                   child: Row(
-//                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                     children: [
-//                       // Título
-//                       const Text(
-//                         'Banco de Questões',
-//                         style: TextStyle(
-//                           color: _textColor,
-//                           fontFamily: 'Inter-Bold',
-//                           fontSize: 30,
-//                           fontWeight: FontWeight.bold,
-//                         ),
-//                       ),
-//                       // Botão adicionar
-//                       ElevatedButton(
-//                         onPressed: () async {
-//                           final resultado = await Navigator.push(
-//                             context,
-//                             MaterialPageRoute(
-//                               builder: (context) =>
-//                                   const AdicionarQuestaoScreen(),
-//                             ),
-//                           );
-//                           if (resultado == true) {
-//                             _carregarDados(); // Recarregar se adicionou
-//                           }
-//                         },
-//                         style: ElevatedButton.styleFrom(
-//                           backgroundColor: _primaryColor,
-//                           foregroundColor: _whiteColor,
-//                           padding: const EdgeInsets.all(12),
-//                           shape: const CircleBorder(),
-//                           elevation: 4,
-//                         ),
-//                         child: const Icon(Icons.add, size: 24),
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-//                 // Filtros
-//                 _buildFiltros(),
-//                 // Lista de questões
-//                 Expanded(
-//                   child: _isLoading
-//                       ? const Center(child: CircularProgressIndicator())
-//                       : _getQuestoesFiltradas().isEmpty
-//                       ? _buildEmptyState()
-//                       : RefreshIndicator(
-//                           onRefresh: _carregarDados,
-//                           color: _primaryColor,
-//                           child: ListView.builder(
-//                             padding: const EdgeInsets.symmetric(horizontal: 16),
-//                             itemCount: _getQuestoesFiltradas().length,
-//                             itemBuilder: (context, index) {
-//                               final questao = _getQuestoesFiltradas()[index];
-//                               return _buildQuestaoCard(questao);
-//                             },
-//                           ),
-//                         ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
+      return true;
+    }).toList();
+  }
 
-//   /// Cria o estado vazio quando não há questões
-//   Widget _buildEmptyState() {
-//     return Center(
-//       child: Column(
-//         mainAxisAlignment: MainAxisAlignment.center,
-//         children: [
-//           Icon(Icons.quiz_outlined, size: 80, color: Colors.grey[400]),
-//           const SizedBox(height: 24),
-//           Text(
-//             'Nenhuma questão cadastrada',
-//             style: TextStyle(
-//               fontSize: 20,
-//               fontWeight: FontWeight.bold,
-//               color: Colors.grey[600],
-//             ),
-//           ),
-//           const SizedBox(height: 8),
-//           Text(
-//             'Clique em "Nova Questão" para começar',
-//             style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
+  String _getNomeDisciplina(String? disciplinaId) {
+    if (disciplinaId == null) return 'Desconhecida';
+    final disciplina = _disciplinas.firstWhere(
+      (d) => d.id == disciplinaId,
+      orElse: () => Discipline(name: 'Desconhecida', semester: 0),
+    );
+    return disciplina.name;
+  }
 
-//   /// Cria os filtros de busca
-//   Widget _buildFiltros() {
-//     return Container(
-//       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-//       padding: const EdgeInsets.all(16),
-//       decoration: BoxDecoration(
-//         color: _whiteColor,
-//         borderRadius: BorderRadius.circular(12),
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.black.withOpacity(0.1),
-//             offset: const Offset(0, 2),
-//             blurRadius: 8,
-//             spreadRadius: 1,
-//           ),
-//         ],
-//       ),
-//       child: Row(
-//         children: [
-//           // Filtro por disciplina
-//           Expanded(
-//             child: DropdownButtonFormField<String?>(
-//               value: _disciplinaFiltro,
-//               decoration: const InputDecoration(
-//                 labelText: 'Disciplina',
-//                 border: OutlineInputBorder(),
-//                 contentPadding: EdgeInsets.symmetric(
-//                   horizontal: 8,
-//                   vertical: 10,
-//                 ),
-//               ),
-//               items: [
-//                 const DropdownMenuItem<String?>(
-//                   value: null,
-//                   child: Text('Todas'),
-//                 ),
-//                 ..._disciplinas.map(
-//                   (disciplina) => DropdownMenuItem<String?>(
-//                     value: disciplina['id'],
-//                     child: Text(
-//                       disciplina['nome'] ?? 'Disciplina sem nome',
-//                       overflow: TextOverflow.ellipsis,
-//                     ),
-//                   ),
-//                 ),
-//               ],
-//               onChanged: (value) {
-//                 setState(() {
-//                   _disciplinaFiltro = value;
-//                 });
-//               },
-//             ),
-//           ),
-//           const SizedBox(width: 8),
-//           // Filtro por dificuldade
-//           Expanded(
-//             child: DropdownButtonFormField<String>(
-//               value: _dificuldadeFiltro,
-//               decoration: const InputDecoration(
-//                 labelText: 'Dificuldade',
-//                 border: OutlineInputBorder(),
-//                 contentPadding: EdgeInsets.symmetric(
-//                   horizontal: 8,
-//                   vertical: 8,
-//                 ),
-//               ),
-//               items: const [
-//                 DropdownMenuItem<String>(value: 'todas', child: Text('Todas')),
-//                 DropdownMenuItem<String>(value: 'facil', child: Text('Fácil')),
-//                 DropdownMenuItem<String>(value: 'media', child: Text('Média')),
-//                 DropdownMenuItem<String>(
-//                   value: 'dificil',
-//                   child: Text('Difícil'),
-//                 ),
-//               ],
-//               onChanged: (value) {
-//                 setState(() {
-//                   _dificuldadeFiltro = value ?? 'todas';
-//                 });
-//               },
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
+  String _getNomeConteudo(String? conteudoId) {
+    if (conteudoId == null) return 'Desconhecido';
+    final conteudo = _conteudos.firstWhere(
+      (c) => c.id == conteudoId,
+      orElse: () => Content(description: 'Desconhecido', subjectId: ''),
+    );
+    return conteudo.description;
+  }
 
-//   /// Cria um card para cada questão
-//   Widget _buildQuestaoCard(Map<String, dynamic> questao) {
-//     return Container(
-//       margin: const EdgeInsets.only(bottom: 16),
-//       decoration: BoxDecoration(
-//         color: _whiteColor,
-//         borderRadius: BorderRadius.circular(12),
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.black.withOpacity(0.1),
-//             offset: const Offset(0, 2),
-//             blurRadius: 8,
-//             spreadRadius: 1,
-//           ),
-//         ],
-//       ),
-//       child: Padding(
-//         padding: const EdgeInsets.all(16),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             // Header com dificuldade e botão editar
-//             Row(
-//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//               children: [
-//                 _buildDificuldadeChip(questao['dificuldade'] ?? 'media'),
-//                 Row(
-//                   children: [
-//                     IconButton(
-//                       onPressed: () => _deletarQuestao(questao),
-//                       icon: const Icon(Icons.delete, color: Colors.red),
-//                       tooltip: 'Deletar questão',
-//                     ),
-//                     IconButton(
-//                       onPressed: () => _editarQuestao(questao),
-//                       icon: const Icon(Icons.edit),
-//                       color: _primaryColor,
-//                       tooltip: 'Editar questão',
-//                     ),
-//                   ],
-//                 ),
-//               ],
-//             ),
-//             const SizedBox(height: 12),
-//             // Enunciado
-//             Text(
-//               questao['enunciado'] ?? 'Enunciado não disponível',
-//               style: const TextStyle(
-//                 fontSize: 16,
-//                 fontWeight: FontWeight.w500,
-//                 color: _textColor,
-//               ),
-//               maxLines: 3,
-//               overflow: TextOverflow.ellipsis,
-//             ),
-//             const SizedBox(height: 12),
-//             // Informações da questão
-//             Row(
-//               children: [
-//                 _buildInfoChip(
-//                   Icons.school,
-//                   _getNomeDisciplina(questao['disciplinaId']),
-//                   Colors.blue,
-//                 ),
-//                 const SizedBox(width: 8),
-//                 _buildInfoChip(
-//                   Icons.access_time,
-//                   _formatarData(questao['dataCriacao']),
-//                   Colors.green,
-//                 ),
-//               ],
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
+  String _getDificuldadeLabel(String difficulty) {
+    switch (difficulty) {
+      case 'easy':
+        return 'Fácil';
+      case 'medium':
+        return 'Médio';
+      case 'hard':
+        return 'Difícil';
+      default:
+        return difficulty;
+    }
+  }
 
-//   /// Cria um chip de dificuldade
-//   Widget _buildDificuldadeChip(String dificuldade) {
-//     Color color;
-//     String texto;
-//     switch (dificuldade.toLowerCase()) {
-//       case 'facil':
-//         color = Colors.green;
-//         texto = 'Fácil';
-//         break;
-//       case 'media':
-//         color = Colors.orange;
-//         texto = 'Média';
-//         break;
-//       case 'dificil':
-//         color = Colors.red;
-//         texto = 'Difícil';
-//         break;
-//       default:
-//         color = Colors.grey;
-//         texto = 'Média';
-//     }
+  Color _getDificuldadeColor(String difficulty) {
+    switch (difficulty) {
+      case 'easy':
+        return Colors.green;
+      case 'medium':
+        return Colors.orange;
+      case 'hard':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
 
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-//       decoration: BoxDecoration(
-//         color: color.withOpacity(0.1),
-//         borderRadius: BorderRadius.circular(20),
-//         border: Border.all(color: color.withOpacity(0.3)),
-//       ),
-//       child: Text(
-//         texto,
-//         style: TextStyle(
-//           fontSize: 12,
-//           fontWeight: FontWeight.bold,
-//           color: color,
-//         ),
-//       ),
-//     );
-//   }
+  Future<void> _deletarQuestao(Question questao) async {
+    final confirmacao = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar exclusão'),
+        content: const Text(
+          'Tem certeza que deseja APAGAR esta questão?\n\nEsta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Apagar'),
+          ),
+        ],
+      ),
+    );
 
-//   /// Cria um chip de informação
-//   Widget _buildInfoChip(IconData icon, String text, Color color) {
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-//       decoration: BoxDecoration(
-//         color: color.withOpacity(0.1),
-//         borderRadius: BorderRadius.circular(12),
-//       ),
-//       child: Row(
-//         mainAxisSize: MainAxisSize.min,
-//         children: [
-//           Icon(icon, size: 14, color: color),
-//           const SizedBox(width: 4),
-//           Text(
-//             text,
-//             style: TextStyle(
-//               fontSize: 12,
-//               fontWeight: FontWeight.w500,
-//               color: color,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
+    if (confirmacao == true && questao.id != null) {
+      try {
+        final sucesso = await _questionService.deleteQuestion(questao.id!);
+        if (mounted) {
+          if (sucesso) {
+            MessageUtils.mostrarSucesso(
+              context,
+              'Questão apagada com sucesso!',
+            );
+            await _carregarQuestoes();
+          } else {
+            MessageUtils.mostrarErro(context, 'Erro ao apagar questão');
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          MessageUtils.mostrarErro(context, 'Erro ao apagar questão: $e');
+        }
+      }
+    }
+  }
 
-//   /// Formata a data de criação
-//   String _formatarData(dynamic timestamp) {
-//     if (timestamp == null) return 'Data não disponível';
+  Future<void> _navegarParaAdicionar() async {
+    final resultado = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AdicionarQuestaoScreen()),
+    );
 
-//     try {
-//       final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-//       return '${date.day}/${date.month}/${date.year}';
-//     } catch (e) {
-//       return 'Data inválida';
-//     }
-//   }
+    if (resultado == true) {
+      await _carregarQuestoes();
+    }
+  }
 
-//   /// Deleta uma questão
-//   Future<void> _deletarQuestao(Map<String, dynamic> questao) async {
-//     final confirmacao = await showDialog<bool>(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         title: const Text('Confirmar exclusão'),
-//         content: Text(
-//           'Tem certeza que deseja deletar a questão:\n"${questao['enunciado']}"?',
-//         ),
-//         actions: [
-//           TextButton(
-//             onPressed: () => Navigator.pop(context, false),
-//             child: const Text('Cancelar'),
-//           ),
-//           TextButton(
-//             onPressed: () => Navigator.pop(context, true),
-//             style: TextButton.styleFrom(foregroundColor: Colors.red),
-//             child: const Text('Deletar'),
-//           ),
-//         ],
-//       ),
-//     );
+  Future<void> _navegarParaEditar(Question questao) async {
+    final resultado = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditarQuestaoScreen(questao: questao),
+      ),
+    );
 
-//     if (confirmacao == true) {
-//       try {
-//         final sucesso = await _questionService.deletarQuestao(questao['id']);
-//         if (sucesso) {
-//           MessageUtils.mostrarSucesso(context, 'Questão deletada com sucesso!');
-//           _carregarDados(); // Recarregar dados
-//         } else {
-//           MessageUtils.mostrarErro(context, 'Erro ao deletar questão');
-//         }
-//       } catch (e) {
-//         MessageUtils.mostrarErro(context, 'Erro ao deletar questão: $e');
-//       }
-//     }
-//   }
+    if (resultado == true) {
+      await _carregarQuestoes();
+    }
+  }
 
-//   /// Navega para a tela de editar questão
-//   void _editarQuestao(Map<String, dynamic> questao) async {
-//     final resultado = await Navigator.push(
-//       context,
-//       MaterialPageRoute(
-//         builder: (context) => EditarQuestaoScreen(questao: questao),
-//       ),
-//     );
-//     if (resultado == true) {
-//       _carregarDados(); // Recarregar se editou
-//     }
-//   }
-// }
+  Widget _buildContainer({required Widget child, double? height}) {
+    return Container(
+      width: double.infinity,
+      height: height,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _whiteColor,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final questoesFiltradas = _getQuestoesFiltradas();
+
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      appBar: AppBar(
+        title: const Text('Banco de Questões'),
+        backgroundColor: _primaryColor,
+        elevation: 0,
+        foregroundColor: _whiteColor,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _buildContainer(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Disciplina',
+                                    style: TextStyle(
+                                      color: _textColor,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  DropdownButtonFormField<String?>(
+                                    value: _disciplinaFiltro,
+                                    decoration: InputDecoration(
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.grey[100],
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                    ),
+                                    items: [
+                                      const DropdownMenuItem(
+                                        value: null,
+                                        child: Text('Todas'),
+                                      ),
+                                      ..._disciplinas.map((disciplina) {
+                                        return DropdownMenuItem(
+                                          value: disciplina.id,
+                                          child: Text(disciplina.name),
+                                        );
+                                      }),
+                                    ],
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _disciplinaFiltro = value;
+                                      });
+                                      _carregarConteudos(value);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Dificuldade',
+                                    style: TextStyle(
+                                      color: _textColor,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  DropdownButtonFormField<String>(
+                                    value: _dificuldadeFiltro,
+                                    decoration: InputDecoration(
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.grey[100],
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 'todas',
+                                        child: Text('Todas'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'easy',
+                                        child: Text('Fácil'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'medium',
+                                        child: Text('Médio'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'hard',
+                                        child: Text('Difícil'),
+                                      ),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        setState(() {
+                                          _dificuldadeFiltro = value;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Conteúdo',
+                              style: TextStyle(
+                                color: _textColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String?>(
+                              value: _conteudoFiltro,
+                              decoration: InputDecoration(
+                                hintText: _disciplinaFiltro == null
+                                    ? 'Selecione uma disciplina primeiro'
+                                    : 'Todos os conteúdos',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey[100],
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              items: [
+                                const DropdownMenuItem(
+                                  value: null,
+                                  child: Text('Todos'),
+                                ),
+                                ..._conteudos.map((conteudo) {
+                                  return DropdownMenuItem(
+                                    value: conteudo.id,
+                                    child: Text(
+                                      conteudo.description,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }),
+                              ],
+                              onChanged: _disciplinaFiltro == null
+                                  ? null
+                                  : (value) {
+                                      setState(() {
+                                        _conteudoFiltro = value;
+                                      });
+                                    },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildContainer(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total: ${questoesFiltradas.length} questão(ões)',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: _navegarParaAdicionar,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Nova Questão'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _primaryColor,
+                            foregroundColor: _whiteColor,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: questoesFiltradas.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.quiz_outlined,
+                                  size: 80,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Nenhuma questão cadastrada',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  onPressed: _navegarParaAdicionar,
+                                  icon: const Icon(Icons.add),
+                                  label: const Text(
+                                    'Adicionar primeira questão',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: questoesFiltradas.length,
+                            itemBuilder: (context, index) {
+                              final questao = questoesFiltradas[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 15),
+                                child: _buildContainer(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              questao.questionText,
+                                              style: TextStyle(
+                                                color: _textColor,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.edit),
+                                                color: _primaryColor,
+                                                onPressed: () =>
+                                                    _navegarParaEditar(questao),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete),
+                                                color: Colors.red,
+                                                onPressed: () =>
+                                                    _deletarQuestao(questao),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: _getDificuldadeColor(
+                                                questao.difficulty.name,
+                                              ).withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: _getDificuldadeColor(
+                                                  questao.difficulty.name,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              _getDificuldadeLabel(
+                                                questao.difficulty.name,
+                                              ),
+                                              style: TextStyle(
+                                                color: _getDificuldadeColor(
+                                                  questao.difficulty.name,
+                                                ),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              _getNomeDisciplina(
+                                                questao.subjectId,
+                                              ),
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 14,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
