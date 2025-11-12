@@ -35,7 +35,7 @@ class ExamService {
         'subjectId': subjectId,
         'teacherId': userId,
         'createdAt': ServerValue.timestamp,
-        'questions': {}, // Start with an empty questions map
+        'questions': {}, 
       };
 
       final newExamRef = _examsRef.push();
@@ -58,27 +58,28 @@ class ExamService {
   }
 
   Future<bool> addQuestionToExam({
-    required String examId,
-    required String questionId,
-    required int number,
-    int? suggestedLines, // Renamed from 'linhasResposta'
-  }) async {
-    try {
-      final questionInExamRef = _examsRef
-          .child(examId)
-          .child('questions')
-          .child(questionId);
+  required String examId,
+  required String questionId,
+  required int number,
+  double peso = 0.0,
+  int? suggestedLines,
+}) async {
+  try {
+    final questionInExamRef =
+        _examsRef.child(examId).child('questions').child(questionId);
 
-      await questionInExamRef.set({
-        'number': number,
-        'suggestedLines': suggestedLines,
-      });
-      return true;
-    } catch (e) {
-      print('Error adding question to exam: $e');
-      return false;
-    }
+    await questionInExamRef.set({
+      'number': number,
+      'peso': peso,
+      'suggestedLines': suggestedLines,
+    });
+
+    return true;
+  } catch (e) {
+    print('Erro ao adicionar questão à prova: $e');
+    return false;
   }
+}
 
   Future<bool> removeQuestionFromExam(String examId, String questionId) async {
     try {

@@ -174,6 +174,7 @@ class FirebaseService {
     required String examId,
     required String questionId,
     required int number,
+    required double peso,
     int? suggestedLines,
   }) {
     return _examService.addQuestionToExam(
@@ -181,6 +182,7 @@ class FirebaseService {
       questionId: questionId,
       number: number,
       suggestedLines: suggestedLines,
+      peso: peso,
     );
   }
 

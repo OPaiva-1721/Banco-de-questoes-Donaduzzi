@@ -1,559 +1,337 @@
-// import 'package:flutter/material.dart';
-// import '../../services/exam_service.dart';
-// import '../../services/discipline_service.dart';
-// import '../../utils/message_utils.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '/services/exam_service.dart';
+import '/models/exam_model.dart';
+import '/core/app_colors.dart';
+import '/utils/message_utils.dart';
+import '/services/pdf_service.dart'; 
+import '/services/course_service.dart';
+import '/services/subject_service.dart';
+import '/models/course_model.dart';
+import '/models/discipline_model.dart';
 
-// class ProvasGeradasScreen extends StatefulWidget {
-//   const ProvasGeradasScreen({super.key});
+class ProvasGeradasScreen extends StatefulWidget {
+  const ProvasGeradasScreen({super.key});
 
-//   @override
-//   State<ProvasGeradasScreen> createState() => _ProvasGeradasScreenState();
-// }
+  @override
+  State<ProvasGeradasScreen> createState() => _ProvasGeradasScreenState();
+}
 
-// class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
-//   // Constantes de cores
-//   static const Color _primaryColor = Color(0xFF541822);
-//   static const Color _backgroundColor = Color(0xFFF5F5F5);
-//   static const Color _textColor = Color(0xFF333333);
-//   static const Color _whiteColor = Colors.white;
+class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
+  // Constantes de cores
+  static const Color _primaryColor = AppColors.primary;
+  static const Color _backgroundColor = AppColors.background;
+  static const Color _textColor = AppColors.text;
+  static const Color _whiteColor = Colors.white;
 
-//   // Serviços
-//   final ExamService _examService = ExamService();
-//   final DisciplineService _disciplineService = DisciplineService();
+  // Serviços
+  final ExamService _examService = ExamService();
+  final CourseService _courseService = CourseService();
+  final SubjectService _subjectService = SubjectService();
 
-//   // Estados
-//   List<Map<String, dynamic>> _provas = [];
-//   List<Map<String, dynamic>> _disciplinas = [];
-//   bool _isLoading = true;
-//   String _filtroStatus = 'todas';
+  // Listas de metadados para consulta
+  List<Course> _cursos = [];
+  List<Discipline> _materias = [];
+  bool _isLoadingPdf = false;
+  bool _isLoadingData = true;
 
-//   @override
-//   void initState() {
-//     super.initState();
-//     _carregarDados();
-//   }
+  @override
+  void initState() {
+    super.initState();
+    _carregarMetadados();
+  }
 
-//   /// Carrega provas e disciplinas do Firebase
-//   Future<void> _carregarDados() async {
-//     setState(() {
-//       _isLoading = true;
-//     });
+  /// Processa o DatabaseEvent
+  List<T> _processarSnapshot<T>(
+      DataSnapshot snapshot, T Function(DataSnapshot) fromSnapshot) {
+    final list = <T>[];
+    if (snapshot.exists && snapshot.value != null) {
+      final data = snapshot.value;
+      if (data is Map) {
+        for (final childSnapshot in snapshot.children) {
+          list.add(fromSnapshot(childSnapshot));
+        }
+      }
+    }
+    return list;
+  }
 
-//     try {
-//       // Carregar disciplinas
-//       await _carregarDisciplinas();
+  /// Carrega cursos e matérias para podermos exibir os nomes
+  Future<void> _carregarMetadados() async {
+    setState(() => _isLoadingData = true);
+    try {
+      final cursosEvent = await _courseService.getCoursesStream().first;
+      final materiasEvent = await _subjectService.getSubjectsStream().first;
 
-//       // Carregar provas
-//       await _carregarProvas();
-//     } catch (e) {
-//       MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
-//     } finally {
-//       if (mounted) {
-//         setState(() {
-//           _isLoading = false;
-//         });
-//       }
-//     }
-//   }
+      if (mounted) {
+        setState(() {
+          _cursos = _processarSnapshot(cursosEvent.snapshot, Course.fromSnapshot);
+          _materias =
+              _processarSnapshot(materiasEvent.snapshot, Discipline.fromSnapshot);
+          _isLoadingData = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingData = false);
+        MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+      }
+    }
+  }
 
-//   /// Carrega disciplinas do Firebase
-//   Future<void> _carregarDisciplinas() async {
-//     try {
-//       final stream = _disciplineService.listarDisciplinas();
-//       await for (final event in stream) {
-//         if (event.snapshot.exists) {
-//           final disciplinas = <Map<String, dynamic>>[];
-//           for (final child in event.snapshot.children) {
-//             final disciplina = {
-//               'id': child.key,
-//               ...Map<String, dynamic>.from(child.value as Map),
-//             };
-//             disciplinas.add(disciplina);
-//           }
-//           if (mounted) {
-//             setState(() {
-//               _disciplinas = disciplinas;
-//             });
-//           }
-//         }
-//       }
-//     } catch (e) {
-//       print('Erro ao carregar disciplinas: $e');
-//     }
-//   }
+  /// Busca o nome do Curso pelo ID
+  String _getNomeCurso(String? courseId) {
+    if (courseId == null) return 'Curso não informado';
+    return _cursos
+        .firstWhere((c) => c.id == courseId, orElse: () => Course(id: '', name: '...'))
+        .name;
+  }
 
-//   /// Carrega provas do Firebase
-//   Future<void> _carregarProvas() async {
-//     try {
-//       final stream = _examService.listarExames();
-//       await for (final event in stream) {
-//         if (event.snapshot.exists) {
-//           final provas = <Map<String, dynamic>>[];
-//           for (final child in event.snapshot.children) {
-//             final prova = {
-//               'id': child.key,
-//               ...Map<String, dynamic>.from(child.value as Map),
-//             };
-//             provas.add(prova);
-//           }
-//           if (mounted) {
-//             setState(() {
-//               _provas = provas;
-//             });
-//           }
-//         }
-//       }
-//     } catch (e) {
-//       print('Erro ao carregar provas: $e');
-//     }
-//   }
+  /// Busca o nome da Matéria pelo ID
+  String _getNomeMateria(String subjectId) {
+    return _materias
+        .firstWhere((m) => m.id == subjectId,
+            orElse: () => Discipline(id: '', name: '...', semester: 0))
+        .name;
+  }
 
-//   /// Filtra provas baseado no status
-//   List<Map<String, dynamic>> _getProvasFiltradas() {
-//     if (_filtroStatus == 'todas') {
-//       return _provas;
-//     }
-//     return _provas.where((prova) => prova['status'] == _filtroStatus).toList();
-//   }
+  /// Chama o serviço de PDF
+  Future<void> _gerarPdf(Exam prova) async {
+    setState(() => _isLoadingPdf = true);
 
-//   /// Obtém o nome da disciplina pelo ID
-//   String _getNomeDisciplina(String? disciplinaId) {
-//     if (disciplinaId == null) return 'Disciplina não encontrada';
+    try {
+      final String nomeCurso = _getNomeCurso(prova.courseId);
+      final String nomeMateria = _getNomeMateria(prova.subjectId);
 
-//     final disciplina = _disciplinas.firstWhere(
-//       (d) => d['id'] == disciplinaId,
-//       orElse: () => {'nome': 'Disciplina não encontrada'},
-//     );
+      // (O PdfService fará o resto, incluindo buscar as questões)
+      await PdfService.gerarProvaPdf(
+        prova: prova,
+        nomeCurso: nomeCurso,
+        nomeMateria: nomeMateria,
+      );
+    } catch (e) {
+      MessageUtils.mostrarErro(context, 'Erro ao gerar PDF: $e');
+    } finally {
+      setState(() => _isLoadingPdf = false);
+    }
+  }
 
-//     return disciplina['nome'] ?? 'Disciplina não encontrada';
-//   }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              // Header
+              Container(
+                width: double.infinity,
+                height: 100,
+                decoration: const BoxDecoration(
+                  color: _primaryColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      offset: Offset(0, 8),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 196,
+                        height: 67,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 196,
+                            height: 67,
+                            decoration: BoxDecoration(
+                              color: _whiteColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'LOGO',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: _primaryColor,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    Positioned(
+                      left: 16,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: _whiteColor,
+                            size: 28,
+                          ),
+                          tooltip: 'Voltar',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-//   /// Formata a data de criação
-//   String _formatarData(dynamic timestamp) {
-//     if (timestamp == null) return 'Data não disponível';
+              // Título da Página
+              const Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Text(
+                  'Provas Geradas',
+                  style: TextStyle(
+                    color: _textColor,
+                    fontFamily: 'Inter-Bold',
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
 
-//     try {
-//       final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-//       return '${date.day}/${date.month}/${date.year}';
-//     } catch (e) {
-//       return 'Data inválida';
-//     }
-//   }
+              // Lista de Provas
+              Expanded(
+                child: _isLoadingData
+                    ? const Center(
+                        child: CircularProgressIndicator(color: _primaryColor))
+                    : StreamBuilder<DatabaseEvent>(
+                        stream: _examService.getExamsStream(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                                child: CircularProgressIndicator(
+                                    color: _primaryColor));
+                          }
+                          if (!snapshot.hasData ||
+                              !snapshot.data!.snapshot.exists) {
+                            return const Center(
+                                child: Text('Nenhuma prova encontrada.'));
+                          }
 
-//   /// Deleta uma prova
-//   Future<void> _deletarProva(Map<String, dynamic> prova) async {
-//     final confirmacao = await showDialog<bool>(
-//       context: context,
-//       builder: (context) => AlertDialog(
-//         title: const Text('Confirmar exclusão'),
-//         content: Text(
-//           'Tem certeza que deseja deletar a prova:\n"${prova['titulo']}"?',
-//         ),
-//         actions: [
-//           TextButton(
-//             onPressed: () => Navigator.pop(context, false),
-//             child: const Text('Cancelar'),
-//           ),
-//           TextButton(
-//             onPressed: () => Navigator.pop(context, true),
-//             style: TextButton.styleFrom(foregroundColor: Colors.red),
-//             child: const Text('Deletar'),
-//           ),
-//         ],
-//       ),
-//     );
+                          // Processa o snapshot para List<Exam>
+                          final provas = _processarSnapshot(
+                              snapshot.data!.snapshot, Exam.fromSnapshot);
 
-//     if (confirmacao == true) {
-//       try {
-//         final sucesso = await _examService.deletarExame(prova['id']);
-//         if (sucesso) {
-//           MessageUtils.mostrarSucesso(context, 'Prova deletada com sucesso!');
-//           _carregarDados(); // Recarregar dados
-//         } else {
-//           MessageUtils.mostrarErro(context, 'Erro ao deletar prova');
-//         }
-//       } catch (e) {
-//         MessageUtils.mostrarErro(context, 'Erro ao deletar prova: $e');
-//       }
-//     }
-//   }
+                          // Ordena das mais recentes para as mais antigas
+                          provas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: _backgroundColor,
-//       body: Column(
-//         children: [
-//           // Header com logo e botão voltar
-//           Container(
-//             width: double.infinity,
-//             height: 100,
-//             decoration: const BoxDecoration(
-//               color: _primaryColor,
-//               boxShadow: [
-//                 BoxShadow(
-//                   color: Colors.black26,
-//                   offset: Offset(0, 8),
-//                   blurRadius: 8,
-//                 ),
-//               ],
-//             ),
-//             child: Stack(
-//               children: [
-//                 // Logo centralizado
-//                 Center(
-//                   child: Image.asset(
-//                     'assets/images/logo.png',
-//                     width: 196,
-//                     height: 67,
-//                     fit: BoxFit.contain,
-//                     errorBuilder: (context, error, stackTrace) {
-//                       return Container(
-//                         width: 196,
-//                         height: 67,
-//                         decoration: BoxDecoration(
-//                           color: _whiteColor,
-//                           borderRadius: BorderRadius.circular(8),
-//                         ),
-//                         child: const Center(
-//                           child: Text(
-//                             'LOGO',
-//                             style: TextStyle(
-//                               fontSize: 18,
-//                               fontWeight: FontWeight.bold,
-//                               color: _primaryColor,
-//                             ),
-//                           ),
-//                         ),
-//                       );
-//                     },
-//                   ),
-//                 ),
-//                 // Botão voltar
-//                 Positioned(
-//                   left: 16,
-//                   top: 0,
-//                   bottom: 0,
-//                   child: Center(
-//                     child: IconButton(
-//                       onPressed: () => Navigator.pop(context),
-//                       icon: const Icon(
-//                         Icons.arrow_back,
-//                         color: _whiteColor,
-//                         size: 28,
-//                       ),
-//                       tooltip: 'Voltar',
-//                       style: IconButton.styleFrom(
-//                         backgroundColor: _primaryColor,
-//                         shape: const CircleBorder(),
-//                       ),
-//                     ),
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           // Conteúdo principal
-//           Expanded(
-//             child: Column(
-//               children: [
-//                 // Título
-//                 Padding(
-//                   padding: const EdgeInsets.all(16),
-//                   child: Row(
-//                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                     children: [
-//                       const Text(
-//                         'Provas Geradas',
-//                         style: TextStyle(
-//                           color: _textColor,
-//                           fontFamily: 'Inter-Bold',
-//                           fontSize: 30,
-//                           fontWeight: FontWeight.bold,
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                 ),
-//                 // Filtro de status
-//                 _buildFiltroStatus(),
-//                 // Lista de provas
-//                 Expanded(
-//                   child: _isLoading
-//                       ? const Center(child: CircularProgressIndicator())
-//                       : _getProvasFiltradas().isEmpty
-//                       ? _buildEmptyState()
-//                       : ListView.builder(
-//                           padding: const EdgeInsets.symmetric(horizontal: 16),
-//                           itemCount: _getProvasFiltradas().length,
-//                           itemBuilder: (context, index) {
-//                             final prova = _getProvasFiltradas()[index];
-//                             return _buildProvaCard(prova);
-//                           },
-//                         ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
+                          return ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: provas.length,
+                            itemBuilder: (context, index) {
+                              final prova = provas[index];
+                              return _buildExamCard(context, prova);
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+          // Loading overlay para PDF
+          if (_isLoadingPdf)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: _whiteColor),
+                    SizedBox(height: 16),
+                    Text(
+                      'Gerando PDF...',
+                      style: TextStyle(color: _whiteColor, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
-//   /// Cria o estado vazio quando não há provas
-//   Widget _buildEmptyState() {
-//     return Center(
-//       child: Column(
-//         mainAxisAlignment: MainAxisAlignment.center,
-//         children: [
-//           Icon(Icons.quiz_outlined, size: 80, color: Colors.grey[400]),
-//           const SizedBox(height: 24),
-//           Text(
-//             'Nenhuma prova gerada',
-//             style: TextStyle(
-//               fontSize: 20,
-//               fontWeight: FontWeight.bold,
-//               color: Colors.grey[600],
-//             ),
-//           ),
-//           const SizedBox(height: 8),
-//           Text(
-//             'Crie uma nova prova para começar',
-//             style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
+  Widget _buildExamCard(BuildContext context, Exam prova) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              prova.title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _textColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(
+              Icons.school,
+              _getNomeCurso(prova.courseId), // Mostra o nome do curso
+            ),
+            const SizedBox(height: 8),
+            _buildInfoRow(
+              Icons.book,
+              _getNomeMateria(prova.subjectId), // Mostra o nome da matéria
+            ),
+            const SizedBox(height: 8),
+            _buildInfoRow(
+              Icons.list_alt,
+              '${prova.questions.length} questões',
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.picture_as_pdf),
+                label: const Text('Gerar PDF'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryColor,
+                  foregroundColor: _whiteColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: _isLoadingPdf ? null : () => _gerarPdf(prova),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-//   /// Cria o filtro de status
-//   Widget _buildFiltroStatus() {
-//     return Container(
-//       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-//       padding: const EdgeInsets.all(16),
-//       decoration: BoxDecoration(
-//         color: _whiteColor,
-//         borderRadius: BorderRadius.circular(12),
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.black.withOpacity(0.1),
-//             offset: const Offset(0, 2),
-//             blurRadius: 8,
-//             spreadRadius: 1,
-//           ),
-//         ],
-//       ),
-//       child: Row(
-//         children: [
-//           const Text(
-//             'Filtrar por status:',
-//             style: TextStyle(
-//               fontSize: 16,
-//               fontWeight: FontWeight.w500,
-//               color: _textColor,
-//             ),
-//           ),
-//           const SizedBox(width: 16),
-//           Expanded(
-//             child: DropdownButtonFormField<String>(
-//               value: _filtroStatus,
-//               decoration: const InputDecoration(
-//                 border: OutlineInputBorder(),
-//                 contentPadding: EdgeInsets.symmetric(
-//                   horizontal: 8,
-//                   vertical: 8,
-//                 ),
-//               ),
-//               items: const [
-//                 DropdownMenuItem<String>(value: 'todas', child: Text('Todas')),
-//                 DropdownMenuItem<String>(
-//                   value: 'rascunho',
-//                   child: Text('Rascunho'),
-//                 ),
-//                 DropdownMenuItem<String>(
-//                   value: 'finalizada',
-//                   child: Text('Finalizada'),
-//                 ),
-//                 DropdownMenuItem<String>(
-//                   value: 'aplicada',
-//                   child: Text('Aplicada'),
-//                 ),
-//               ],
-//               onChanged: (value) {
-//                 setState(() {
-//                   _filtroStatus = value ?? 'todas';
-//                 });
-//               },
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   /// Cria um card para cada prova
-//   Widget _buildProvaCard(Map<String, dynamic> prova) {
-//     final status = prova['status'] ?? 'rascunho';
-
-//     return Container(
-//       margin: const EdgeInsets.only(bottom: 16),
-//       decoration: BoxDecoration(
-//         color: _whiteColor,
-//         borderRadius: BorderRadius.circular(12),
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.black.withOpacity(0.1),
-//             offset: const Offset(0, 2),
-//             blurRadius: 8,
-//             spreadRadius: 1,
-//           ),
-//         ],
-//       ),
-//       child: Padding(
-//         padding: const EdgeInsets.all(16),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             // Header com status e botões
-//             Row(
-//               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//               children: [
-//                 _buildStatusChip(status),
-//                 Row(
-//                   children: [
-//                     IconButton(
-//                       onPressed: () => _deletarProva(prova),
-//                       icon: const Icon(Icons.delete, color: Colors.red),
-//                       tooltip: 'Deletar prova',
-//                     ),
-//                     IconButton(
-//                       onPressed: () {
-//                         // TODO: Implementar visualização/edição da prova
-//                         MessageUtils.mostrarSucesso(
-//                           context,
-//                           'Funcionalidade em desenvolvimento',
-//                         );
-//                       },
-//                       icon: const Icon(Icons.visibility),
-//                       color: _primaryColor,
-//                       tooltip: 'Visualizar prova',
-//                     ),
-//                   ],
-//                 ),
-//               ],
-//             ),
-//             const SizedBox(height: 12),
-//             // Título da prova
-//             Text(
-//               prova['titulo'] ?? 'Prova sem título',
-//               style: const TextStyle(
-//                 fontSize: 18,
-//                 fontWeight: FontWeight.bold,
-//                 color: _textColor,
-//               ),
-//             ),
-//             const SizedBox(height: 8),
-//             // Informações da prova
-//             Row(
-//               children: [
-//                 _buildInfoChip(
-//                   Icons.school,
-//                   _getNomeDisciplina(prova['disciplinaId']),
-//                   Colors.blue,
-//                 ),
-//                 const SizedBox(width: 8),
-//                 _buildInfoChip(
-//                   Icons.quiz,
-//                   '${prova['estatisticas']?['totalQuestoes'] ?? 0} questões',
-//                   Colors.green,
-//                 ),
-//                 const SizedBox(width: 8),
-//                 _buildInfoChip(
-//                   Icons.calendar_today,
-//                   _formatarData(prova['dataCriacao']),
-//                   Colors.orange,
-//                 ),
-//               ],
-//             ),
-//             if (prova['instrucoes'] != null &&
-//                 prova['instrucoes'].isNotEmpty) ...[
-//               const SizedBox(height: 8),
-//               Text(
-//                 prova['instrucoes'],
-//                 style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-//                 maxLines: 2,
-//                 overflow: TextOverflow.ellipsis,
-//               ),
-//             ],
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   /// Cria um chip de status
-//   Widget _buildStatusChip(String status) {
-//     Color color;
-//     String texto;
-//     switch (status.toLowerCase()) {
-//       case 'rascunho':
-//         color = Colors.orange;
-//         texto = 'Rascunho';
-//         break;
-//       case 'finalizada':
-//         color = Colors.green;
-//         texto = 'Finalizada';
-//         break;
-//       case 'aplicada':
-//         color = Colors.blue;
-//         texto = 'Aplicada';
-//         break;
-//       default:
-//         color = Colors.grey;
-//         texto = 'Rascunho';
-//     }
-
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-//       decoration: BoxDecoration(
-//         color: color.withOpacity(0.1),
-//         borderRadius: BorderRadius.circular(20),
-//         border: Border.all(color: color.withOpacity(0.3)),
-//       ),
-//       child: Text(
-//         texto,
-//         style: TextStyle(
-//           fontSize: 12,
-//           fontWeight: FontWeight.bold,
-//           color: color,
-//         ),
-//       ),
-//     );
-//   }
-
-//   /// Cria um chip de informação
-//   Widget _buildInfoChip(IconData icon, String text, Color color) {
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-//       decoration: BoxDecoration(
-//         color: color.withOpacity(0.1),
-//         borderRadius: BorderRadius.circular(12),
-//       ),
-//       child: Row(
-//         mainAxisSize: MainAxisSize.min,
-//         children: [
-//           Icon(icon, size: 14, color: color),
-//           const SizedBox(width: 4),
-//           Text(
-//             text,
-//             style: TextStyle(
-//               fontSize: 12,
-//               fontWeight: FontWeight.w500,
-//               color: color,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey[700]),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 14, color: Colors.grey[800]),
+          ),
+        ),
+      ],
+    );
+  }
+}

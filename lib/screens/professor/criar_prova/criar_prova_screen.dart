@@ -1,643 +1,618 @@
-// import 'package:flutter/material.dart';
-// import 'package:firebase_database/firebase_database.dart';
-// import '../../../core/app_colors.dart';
-// import '../../../core/app_constants.dart';
-// import '../../../services/exam_service.dart';
-// import '../../../services/discipline_service.dart';
-// import '../../../services/course_service.dart';
-// import '../../../utils/message_utils.dart';
-// import 'selecionar_questoes_screen.dart';
+import 'package:flutter/material.dart';
+import '/services/exam_service.dart';
+import '/models/course_model.dart';
+import '/models/discipline_model.dart';
+import '/models/content_model.dart';
+import '/services/course_service.dart';
+import '/services/subject_service.dart';
+import '/services/content_service.dart';
+import '/utils/message_utils.dart';
+import '/core/app_colors.dart';
+import '/core/app_constants.dart';
+import 'selecionar_questoes_screen.dart';
+import 'package:firebase_database/firebase_database.dart'; 
 
-// class CriarProvaScreen extends StatefulWidget {
-//   const CriarProvaScreen({super.key});
+class CriarProvaScreen extends StatefulWidget {
+  const CriarProvaScreen({super.key});
 
-//   @override
-//   State<CriarProvaScreen> createState() => _CriarProvaScreenState();
-// }
+  @override
+  State<CriarProvaScreen> createState() => _CriarProvaScreenState();
+}
 
-// class _CriarProvaScreenState extends State<CriarProvaScreen> {
-//   // Constantes de cores
-//   static const Color _primaryColor = AppColors.primary;
-//   static const Color _backgroundColor = AppColors.background;
-//   static const Color _textColor = AppColors.text;
-//   static const Color _whiteColor = AppColors.white;
+class _CriarProvaScreenState extends State<CriarProvaScreen> {
+  // Constantes de cores
+  static const Color _primaryColor = AppColors.primary;
+  static const Color _backgroundColor = AppColors.background;
+  static const Color _textColor = AppColors.text;
+  static const Color _whiteColor = AppColors.white;
 
-//   // Serviços
-//   final ExamService _examService = ExamService();
-//   final DisciplineService _disciplineService = DisciplineService();
-//   final CourseService _courseService = CourseService();
+  // Serviços
+  final ExamService _examService = ExamService();
+  final CourseService _courseService = CourseService();
+  final SubjectService _subjectService = SubjectService(); 
+  final ContentService _contentService = ContentService(); 
 
-//   // Estados dos dropdowns
-//   String? _cursoSelecionado;
-//   String? _disciplinaSelecionada;
-//   final TextEditingController _tituloController = TextEditingController();
-//   final TextEditingController _instrucoesController = TextEditingController();
+  // Controladores
+  final TextEditingController _tituloController = TextEditingController();
+  final TextEditingController _instrucoesController = TextEditingController();
 
-//   // Estados
-//   bool _isLoading = false;
-//   List<Map<String, dynamic>> _cursos = [];
-//   List<Map<String, dynamic>> _disciplinas = [];
+  // Estados dos dropdowns (IDs)
+  String? _cursoSelecionado;
+  String? _materiaSelecionada; 
+  String? _conteudoSelecionado; 
 
-//   @override
-//   void initState() {
-//     super.initState();
-//     _testarConexaoFirebase();
-//     _carregarCursos();
-//     _carregarDisciplinas();
-//   }
+  // Listas de dados (agora usam models)
+  List<Course> _cursos = [];
+  List<Discipline> _materias = [];
+  List<Content> _conteudos = [];
 
-//   /// Testa a conexão com o Firebase
-//   Future<void> _testarConexaoFirebase() async {
-//     try {
-//       print('🔥 Testando conexão com Firebase...');
-//       final database = FirebaseDatabase.instance;
-//       final ref = database.ref();
-//       final snapshot = await ref.get();
-//       print(
-//         '✅ Conexão com Firebase OK - Dados disponíveis: ${snapshot.exists}',
-//       );
+  // Listas filtradas para os dropdowns
+  List<Content> _conteudosFiltrados = [];
 
-//       if (snapshot.exists) {
-//         print('📊 Estrutura do banco: ${snapshot.value}');
-//       } else {
-//         print('⚠️ Banco de dados vazio - pode ser necessário popular dados');
-//         _verificarSePrecisaPopularDados();
-//       }
-//     } catch (e) {
-//       print('❌ Erro na conexão com Firebase: $e');
-//     }
-//   }
+  bool _isLoading = true;
 
-//   /// Verifica se precisa popular dados de teste
-//   Future<void> _verificarSePrecisaPopularDados() async {
-//     try {
-//       print('🔍 Verificando se há dados de cursos e disciplinas...');
+  @override
+  void initState() {
+    super.initState();
+    _carregarDados();
+  }
 
-//       // Verificar cursos
-//       final cursosSnapshot = await FirebaseDatabase.instance
-//           .ref('cursos')
-//           .get();
-//       print('📊 Cursos encontrados: ${cursosSnapshot.children.length}');
+  /// **NOVO HELPER** para processar o DatabaseEvent
+  List<T> _processarSnapshot<T>(
+      DataSnapshot snapshot, T Function(DataSnapshot) fromSnapshot) {
+    final list = <T>[];
+    if (snapshot.exists && snapshot.value != null) {
+      final data = snapshot.value;
+      if (data is Map) {
+        for (final childSnapshot in snapshot.children) {
+          list.add(fromSnapshot(childSnapshot));
+        }
+      }
+    }
+    return list;
+  }
 
-//       // Verificar disciplinas
-//       final disciplinasSnapshot = await FirebaseDatabase.instance
-//           .ref('disciplinas')
-//           .get();
-//       print(
-//         '📚 Disciplinas encontradas: ${disciplinasSnapshot.children.length}',
-//       );
+  /// Carrega Cursos, Matérias e Conteúdos do Firebase
+  Future<void> _carregarDados() async {
+    setState(() => _isLoading = true);
+    try {
+      // 1. Pega os streams
+      final cursosStream = _courseService.getCoursesStream();
+      final materiasStream = _subjectService.getSubjectsStream(); 
+      final conteudosStream = _contentService.getContentStream(); 
 
-//       if (cursosSnapshot.children.isEmpty ||
-//           disciplinasSnapshot.children.isEmpty) {
-//         print(
-//           '⚠️ Dados insuficientes encontrados. Recomenda-se usar a função "Popular Dados" na tela principal.',
-//         );
-//         if (mounted) {
-//           MessageUtils.mostrarErro(
-//             context,
-//             'Nenhum curso ou disciplina encontrado. Use "Popular Dados" na tela principal para adicionar dados de exemplo.',
-//           );
-//         }
-//       }
-//     } catch (e) {
-//       print('❌ Erro ao verificar dados: $e');
-//     }
-//   }
+      // 2. Espera pelo primeiro 'DatabaseEvent' de cada um
+      final results = await Future.wait([
+        cursosStream.first,
+        materiasStream.first,
+        conteudosStream.first,
+      ]);
 
-//   @override
-//   void dispose() {
-//     _tituloController.dispose();
-//     _instrucoesController.dispose();
-//     super.dispose();
-//   }
+      // 3. Processa o 'snapshot' de cada 'DatabaseEvent'
+      final DatabaseEvent courseEvent = results[0];
+      final DatabaseEvent subjectEvent = results[1];
+      final DatabaseEvent contentEvent = results[2];
 
-//   /// Carrega cursos do Firebase
-//   Future<void> _carregarCursos() async {
-//     try {
-//       print('🔍 Iniciando carregamento de cursos...');
-//       final stream = _courseService.listarCursos();
-//       await for (final event in stream) {
-//         print(
-//           '📡 Evento de cursos recebido do Firebase: ${event.snapshot.exists}',
-//         );
-//         if (event.snapshot.exists) {
-//           final cursos = <Map<String, dynamic>>[];
-//           print(
-//             '📊 Número de cursos encontrados: ${event.snapshot.children.length}',
-//           );
+      final List<Course> cursos =
+          _processarSnapshot(courseEvent.snapshot, Course.fromSnapshot);
+      final List<Discipline> materias =
+          _processarSnapshot(subjectEvent.snapshot, Discipline.fromSnapshot);
+      final List<Content> conteudos =
+          _processarSnapshot(contentEvent.snapshot, Content.fromSnapshot);
 
-//           for (final child in event.snapshot.children) {
-//             final curso = {
-//               'id': child.key,
-//               ...Map<String, dynamic>.from(child.value as Map),
-//             };
-//             print(
-//               '🎓 Curso carregado: ${curso['nome']} (ID: ${curso['id']}, Status: ${curso['status']})',
-//             );
-//             // Só adiciona cursos ativos
-//             if (curso['status'] == 'ativo') {
-//               cursos.add(curso);
-//               print('✅ Curso ativo adicionado: ${curso['nome']}');
-//             } else {
-//               print('❌ Curso inativo ignorado: ${curso['nome']}');
-//             }
-//           }
+      if (mounted) {
+        setState(() {
+          _cursos = cursos;
+          _materias = materias;
+          _conteudos = conteudos;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+        print('Erro detalhado ao carregar dados: $e'); // Para depuração
+      }
+    }
+  }
 
-//           print('✅ Total de cursos ativos processados: ${cursos.length}');
-//           if (mounted) {
-//             setState(() {
-//               _cursos = cursos;
-//             });
-//             print('🔄 Estado atualizado com ${_cursos.length} cursos');
-//           }
-//         } else {
-//           print('❌ Nenhum curso encontrado no Firebase');
-//         }
-//       }
-//     } catch (e) {
-//       print('💥 Erro ao carregar cursos: $e');
-//       if (mounted) {
-//         MessageUtils.mostrarErro(context, 'Erro ao carregar cursos: $e');
-//       }
-//     }
-//   }
+  /// Filtra a lista de Conteúdos com base na Matéria (Discipline)
+  void _atualizarConteudos(String? novoIdMateria) {
+    setState(() {
+      _materiaSelecionada = novoIdMateria; 
+      _conteudoSelecionado = null; 
+      if (novoIdMateria == null) {
+        _conteudosFiltrados = [];
+      } else {
+        // Filtra Conteúdos pelo 'subjectId' (ID da Matéria)
+        _conteudosFiltrados = _conteudos
+            .where((conteudo) => conteudo.subjectId == novoIdMateria)
+            .toList();
+      }
+    });
+  }
 
-//   /// Carrega disciplinas do Firebase
-//   Future<void> _carregarDisciplinas() async {
-//     try {
-//       print('🔍 Iniciando carregamento de disciplinas...');
-//       final stream = _disciplineService.listarDisciplinas();
-//       await for (final event in stream) {
-//         print('📡 Evento recebido do Firebase: ${event.snapshot.exists}');
-//         if (event.snapshot.exists) {
-//           final disciplinas = <Map<String, dynamic>>[];
-//           print(
-//             '📊 Número de disciplinas encontradas: ${event.snapshot.children.length}',
-//           );
+  @override
+  void dispose() {
+    _tituloController.dispose();
+    _instrucoesController.dispose();
+    super.dispose();
+  }
 
-//           for (final child in event.snapshot.children) {
-//             final disciplina = {
-//               'id': child.key,
-//               ...Map<String, dynamic>.from(child.value as Map),
-//             };
-//             print(
-//               '📚 Disciplina carregada: ${disciplina['nome']} (ID: ${disciplina['id']}, Curso: ${disciplina['cursoId']})',
-//             );
-//             disciplinas.add(disciplina);
-//           }
+  /// Valida se todos os campos obrigatórios foram preenchidos
+  bool _validarFormulario() {
+    if (_cursoSelecionado == null) {
+      MessageUtils.mostrarErro(context, 'Selecione um curso');
+      return false;
+    }
+    if (_materiaSelecionada == null) {
+      MessageUtils.mostrarErro(context, 'Selecione uma matéria');
+      return false;
+    }
+    if (_tituloController.text.trim().isEmpty) {
+      MessageUtils.mostrarErro(context, 'Digite um título para a prova');
+      return false;
+    }
+    if (_instrucoesController.text.trim().isEmpty) {
+      MessageUtils.mostrarErro(context, 'Digite as instruções da prova');
+      return false;
+    }
+    return true;
+  }
 
-//           print('✅ Total de disciplinas processadas: ${disciplinas.length}');
-//           if (mounted) {
-//             setState(() {
-//               _disciplinas = disciplinas;
-//             });
-//             print(
-//               '🔄 Estado atualizado com ${_disciplinas.length} disciplinas',
-//             );
-//           }
-//         } else {
-//           print('❌ Nenhuma disciplina encontrada no Firebase');
-//         }
-//       }
-//     } catch (e) {
-//       print('💥 Erro ao carregar disciplinas: $e');
-//       if (mounted) {
-//         MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
-//       }
-//     }
-//   }
+  /// Navega para a tela de seleção de questões
+  Future<void> _selecionarQuestoes() async {
+    if (!_validarFormulario()) return;
 
-//   /// Filtra disciplinas por curso selecionado
-//   List<Map<String, dynamic>> _getDisciplinasFiltradas() {
-//     print('🔍 Filtrando disciplinas para curso: $_cursoSelecionado');
-//     print('📊 Total de disciplinas disponíveis: ${_disciplinas.length}');
+    final resultado = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SelecionarQuestoesScreen(
+          // Passa os IDs com os nomes corretos dos models:
+          subjectId: _materiaSelecionada!, 
+          contentId: _conteudoSelecionado, 
+          tituloProva: _tituloController.text.trim(),
+          instrucoesProva: _instrucoesController.text.trim(),
+        ),
+      ),
+    );
 
-//     if (_cursoSelecionado == null) {
-//       print('❌ Nenhum curso selecionado');
-//       return [];
-//     }
+    if (resultado != null && resultado is Map<String, dynamic>) {
+      await _criarProvaComQuestoes(resultado);
+    }
+  }
 
-//     // Filtrar disciplinas pelo curso selecionado
-//     final disciplinasFiltradas = _disciplinas.where((disciplina) {
-//       final match = disciplina['cursoId'] == _cursoSelecionado;
-//       print(
-//         '🔍 Disciplina "${disciplina['nome']}" (cursoId: ${disciplina['cursoId']}) - Match: $match',
-//       );
-//       return match;
-//     }).toList();
+  /// Cria a prova com as questões selecionadas
+  Future<void> _criarProvaComQuestoes(Map<String, dynamic> dados) async {
+    setState(() {
+      _isLoading = true;
+    });
 
-//     print(
-//       '✅ Disciplinas filtradas encontradas: ${disciplinasFiltradas.length}',
-//     );
-//     return disciplinasFiltradas;
-//   }
+    try {
+      final questoesMaps = dados['questoes'] as List<Map<String, dynamic>>;
 
-//   /// Valida se todos os campos obrigatórios foram preenchidos
-//   bool _validarFormulario() {
-//     if (_cursoSelecionado == null) {
-//       MessageUtils.mostrarErro(context, 'Selecione um curso');
-//       return false;
-//     }
-//     if (_disciplinaSelecionada == null) {
-//       MessageUtils.mostrarErro(context, 'Selecione uma disciplina');
-//       return false;
-//     }
-//     if (_tituloController.text.trim().isEmpty) {
-//       MessageUtils.mostrarErro(context, 'Digite um título para a prova');
-//       return false;
-//     }
-//     if (_instrucoesController.text.trim().isEmpty) {
-//       MessageUtils.mostrarErro(context, 'Digite as instruções da prova');
-//       return false;
-//     }
-//     return true;
-//   }
+      // ETAPA 1: Criar a "casca" da prova
+      final String? exameId = await _examService.createExam(
+        title: dados['titulo'],
+        instructions: dados['instrucoes'],
+        subjectId: _materiaSelecionada, // 'subjectId' é o ID da Matéria
+      );
 
-//   /// Navega para a tela de seleção de questões
-//   Future<void> _selecionarQuestoes() async {
-//     if (!_validarFormulario()) return;
+      if (exameId == null) {
+        throw Exception('Não foi possível obter o ID da nova prova.');
+      }
 
-//     final resultado = await Navigator.push(
-//       context,
-//       MaterialPageRoute(
-//         builder: (context) => SelecionarQuestoesScreen(
-//           disciplinaId: _disciplinaSelecionada!,
-//           tituloProva: _tituloController.text.trim(),
-//           instrucoesProva: _instrucoesController.text.trim(),
-//         ),
-//       ),
-//     );
+      // ETAPA 2: Salvar o ID do curso na prova (como pedido)
+      await _examService.updateExam(exameId, {
+        'courseId': _cursoSelecionado,
+      });
 
-//     if (resultado != null && resultado is Map<String, dynamic>) {
-//       await _criarProvaComQuestoes(resultado);
-//     }
-//   }
+      // ETAPA 3: Adicionar as questões à prova, uma por uma
+      bool allQuestionsAdded = true;
+      for (int i = 0; i < questoesMaps.length; i++) {
+        final questaoMap = questoesMaps[i];
+        final String questionId = questaoMap['id'];
+        final int order = i + 1;
+        final double peso =
+            questaoMap['peso'] ?? 0.0; // Pega o peso do map
 
-//   /// Cria a prova com as questões selecionadas
-//   Future<void> _criarProvaComQuestoes(Map<String, dynamic> dados) async {
-//     setState(() {
-//       _isLoading = true;
-//     });
+        // Chama o service com o 'peso'
+        final bool success = await _examService.addQuestionToExam(
+          examId: exameId,
+          questionId: questionId,
+          number: order,
+          peso: peso, 
+          suggestedLines: null,
+        );
 
-//     try {
-//       final questoes = dados['questoes'] as List<Map<String, dynamic>>;
+        if (!success) {
+          allQuestionsAdded = false;
+        }
+      }
 
-//       // Preparar questões para o exame
-//       final questoesExame = <String, Map<String, dynamic>>{};
-//       for (int i = 0; i < questoes.length; i++) {
-//         questoesExame[questoes[i]['id']] = {'ordem': i + 1, 'peso': 1.0};
-//       }
+      if (allQuestionsAdded) {
+        MessageUtils.mostrarSucesso(
+          context,
+          'Prova criada com sucesso com ${questoesMaps.length} questões!',
+        );
+      } else {
+        MessageUtils.mostrarErro(
+          context,
+          'Prova criada, mas algumas questões falharam ao ser adicionadas.',
+        );
+      }
 
-//       final exameId = await _examService.criarExame(
-//         titulo: dados['titulo'],
-//         instrucoes: dados['instrucoes'],
-//         disciplinaId: _disciplinaSelecionada!,
-//         configuracoes: {
-//           'tempoLimite': 3600, // 1 hora em segundos
-//           'permiteVoltar': true,
-//           'mostraRespostas': false,
-//           'pesoTotal': questoes.length.toDouble(),
-//           'permiteConsultarMaterial': false,
-//           'ordemQuestoes': 'sequencial',
-//           'mostraProgresso': true,
-//           'questoes': questoesExame,
-//         },
-//       );
+      Navigator.pop(context, true);
+    } catch (e) {
+      MessageUtils.mostrarErro(context, 'Erro ao criar prova: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
-//       if (exameId != null) {
-//         MessageUtils.mostrarSucesso(
-//           context,
-//           'Prova criada com sucesso com ${questoes.length} questões!',
-//         );
-//         Navigator.pop(context, true); // Retorna true para indicar sucesso
-//       } else {
-//         MessageUtils.mostrarErro(context, 'Erro ao criar prova');
-//       }
-//     } catch (e) {
-//       MessageUtils.mostrarErro(context, 'Erro ao criar prova: $e');
-//     } finally {
-//       setState(() {
-//         _isLoading = false;
-//       });
-//     }
-//   }
+  Widget _buildContainer({required Widget child, double? height}) {
+    return Container(
+      width: double.infinity,
+      height: height ?? 50,
+      decoration: BoxDecoration(
+        color: _whiteColor,
+        borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            offset: const Offset(0, 4),
+            blurRadius: 4,
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
 
-//   /// Cria um container reutilizável com estilo padrão
-//   Widget _buildContainer({required Widget child, double? height}) {
-//     return Container(
-//       width: double.infinity,
-//       height: height ?? 50,
-//       decoration: BoxDecoration(
-//         color: _whiteColor,
-//         borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.black.withOpacity(0.25),
-//             offset: const Offset(0, 4),
-//             blurRadius: 4,
-//           ),
-//         ],
-//       ),
-//       child: child,
-//     );
-//   }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      body: Column(
+        children: [
+          // Header
+          Container(
+            width: double.infinity,
+            height: 100,
+            decoration: const BoxDecoration(
+              color: _primaryColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 8),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 196,
+                    height: 67,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 196,
+                        height: 67,
+                        decoration: BoxDecoration(
+                          color: _whiteColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'LOGO',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _primaryColor,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  left: 16,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: _whiteColor,
+                        size: 28,
+                      ),
+                      tooltip: 'Voltar',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Conteúdo principal
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: _primaryColor))
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Center(
+                          child: Text(
+                            'Criar Nova Prova',
+                            style: TextStyle(
+                              color: _textColor,
+                              fontFamily: 'Inter-Bold',
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
 
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: _backgroundColor,
-//       body: Column(
-//         children: [
-//           // Header com logo e botão voltar
-//           Container(
-//             width: double.infinity,
-//             height: 100,
-//             decoration: const BoxDecoration(
-//               color: _primaryColor,
-//               boxShadow: [
-//                 BoxShadow(
-//                   color: Colors.black26,
-//                   offset: Offset(0, 8),
-//                   blurRadius: 8,
-//                 ),
-//               ],
-//             ),
-//             child: Stack(
-//               children: [
-//                 // Logo centralizado
-//                 Center(
-//                   child: Image.asset(
-//                     'assets/images/logo.png',
-//                     width: 196,
-//                     height: 67,
-//                     fit: BoxFit.contain,
-//                     errorBuilder: (context, error, stackTrace) {
-//                       return Container(
-//                         width: 196,
-//                         height: 67,
-//                         decoration: BoxDecoration(
-//                           color: _whiteColor,
-//                           borderRadius: BorderRadius.circular(8),
-//                         ),
-//                         child: const Center(
-//                           child: Text(
-//                             'LOGO',
-//                             style: TextStyle(
-//                               fontSize: 18,
-//                               fontWeight: FontWeight.bold,
-//                               color: _primaryColor,
-//                             ),
-//                           ),
-//                         ),
-//                       );
-//                     },
-//                   ),
-//                 ),
-//                 // Botão voltar
-//                 Positioned(
-//                   left: 16,
-//                   top: 0,
-//                   bottom: 0,
-//                   child: Center(
-//                     child: IconButton(
-//                       onPressed: () => Navigator.pop(context),
-//                       icon: const Icon(
-//                         Icons.arrow_back,
-//                         color: _whiteColor,
-//                         size: 28,
-//                       ),
-//                       tooltip: 'Voltar',
-//                       style: IconButton.styleFrom(
-//                         backgroundColor: _primaryColor,
-//                         shape: const CircleBorder(),
-//                       ),
-//                     ),
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           // Conteúdo principal
-//           Expanded(
-//             child: SingleChildScrollView(
-//               padding: const EdgeInsets.all(AppConstants.defaultPadding),
-//               child: Column(
-//                 crossAxisAlignment: CrossAxisAlignment.start,
-//                 children: [
-//                   // Título
-//                   const Center(
-//                     child: Text(
-//                       'Criar Nova Prova',
-//                       style: TextStyle(
-//                         color: _textColor,
-//                         fontFamily: 'Inter-Bold',
-//                         fontSize: 30,
-//                         fontWeight: FontWeight.bold,
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 32),
+                        // Campo Título da Prova
+                        const Text(
+                          'Título da Prova',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          height: 50,
+                          child: TextField(
+                            controller: _tituloController,
+                            decoration: const InputDecoration(
+                              hintText: 'Digite o título da prova',
+                              hintStyle: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w300,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
 
-//                   // Campo Curso
-//                   const Text(
-//                     'Curso',
-//                     style: TextStyle(
-//                       color: _textColor,
-//                       fontFamily: 'Inter-Bold',
-//                       fontSize: 25,
-//                       fontWeight: FontWeight.bold,
-//                     ),
-//                   ),
-//                   const SizedBox(height: 16),
-//                   _buildContainer(
-//                     child: DropdownButtonHideUnderline(
-//                       child: DropdownButton<String>(
-//                         value: _cursoSelecionado,
-//                         hint: const Padding(
-//                           padding: EdgeInsets.symmetric(horizontal: 16),
-//                           child: Text(
-//                             'Selecione o curso',
-//                             style: TextStyle(
-//                               color: Colors.black54,
-//                               fontSize: 16,
-//                               fontWeight: FontWeight.w300,
-//                             ),
-//                           ),
-//                         ),
-//                         items: _cursos.map((curso) {
-//                           return DropdownMenuItem<String>(
-//                             value: curso['id'],
-//                             child: Padding(
-//                               padding: const EdgeInsets.symmetric(
-//                                 horizontal: 16,
-//                               ),
-//                               child: Text(curso['nome'] ?? 'Curso sem nome'),
-//                             ),
-//                           );
-//                         }).toList(),
-//                         onChanged: (String? newValue) {
-//                           setState(() {
-//                             _cursoSelecionado = newValue;
-//                             _disciplinaSelecionada =
-//                                 null; // Reset disciplina quando curso muda
-//                           });
-//                         },
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 32),
+                        // Campo de instruções
+                        const Text(
+                          'Instruções',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          height: 100,
+                          child: TextField(
+                            controller: _instrucoesController,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                              hintText: 'Digite as instruções da prova',
+                              hintStyle: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w300,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
 
-//                   // Campo Disciplina
-//                   const Text(
-//                     'Disciplina',
-//                     style: TextStyle(
-//                       color: _textColor,
-//                       fontFamily: 'Inter-Bold',
-//                       fontSize: 25,
-//                       fontWeight: FontWeight.bold,
-//                     ),
-//                   ),
-//                   const SizedBox(height: 16),
-//                   _buildContainer(
-//                     child: DropdownButtonHideUnderline(
-//                       child: DropdownButton<String>(
-//                         value: _disciplinaSelecionada,
-//                         hint: const Padding(
-//                           padding: EdgeInsets.symmetric(horizontal: 16),
-//                           child: Text(
-//                             'Selecione a disciplina',
-//                             style: TextStyle(
-//                               color: Colors.black54,
-//                               fontSize: 16,
-//                               fontWeight: FontWeight.w300,
-//                             ),
-//                           ),
-//                         ),
-//                         items: _getDisciplinasFiltradas().map((disciplina) {
-//                           return DropdownMenuItem<String>(
-//                             value: disciplina['id'],
-//                             child: Padding(
-//                               padding: const EdgeInsets.symmetric(
-//                                 horizontal: 16,
-//                               ),
-//                               child: Text(
-//                                 disciplina['nome'] ?? 'Disciplina sem nome',
-//                               ),
-//                             ),
-//                           );
-//                         }).toList(),
-//                         onChanged: _cursoSelecionado != null
-//                             ? (String? newValue) {
-//                                 setState(() {
-//                                   _disciplinaSelecionada = newValue;
-//                                 });
-//                               }
-//                             : null,
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 32),
+                        // *** CAMPO CURSO ***
+                        const Text(
+                          'Curso (Obrigatório)',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _cursoSelecionado,
+                              hint: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Selecione o curso',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w300,
+                                  ),
+                                ),
+                              ),
+                              items: _cursos.map((Course curso) {
+                                return DropdownMenuItem<String>(
+                                  value: curso.id,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Text(curso.name),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                // CORREÇÃO: Apenas define o estado
+                                setState(() {
+                                  _cursoSelecionado = newValue;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
 
-//                   // Campo Título
-//                   const Text(
-//                     'Título da Prova',
-//                     style: TextStyle(
-//                       color: _textColor,
-//                       fontFamily: 'Inter-Bold',
-//                       fontSize: 25,
-//                       fontWeight: FontWeight.bold,
-//                     ),
-//                   ),
-//                   const SizedBox(height: 16),
-//                   _buildContainer(
-//                     height: 100,
-//                     child: TextField(
-//                       controller: _tituloController,
-//                       decoration: const InputDecoration(
-//                         hintText: 'Digite o título da prova',
-//                         hintStyle: TextStyle(
-//                           color: Colors.black54,
-//                           fontSize: 16,
-//                           fontWeight: FontWeight.w300,
-//                         ),
-//                         border: InputBorder.none,
-//                         contentPadding: EdgeInsets.all(16),
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 16),
+                        // *** CAMPO MATÉRIA ***
+                        const Text(
+                          'Matéria (Obrigatório)',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _materiaSelecionada,
+                              hint: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Selecione a matéria',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w300,
+                                  ),
+                                ),
+                              ),
+                              // CORREÇÃO: Popula com a lista completa de matérias
+                              items: _materias.map((Discipline materia) {
+                                return DropdownMenuItem<String>(
+                                  value: materia.id,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Text(materia.name),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                _atualizarConteudos(newValue);
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
 
-//                   // Campo de instruções
-//                   _buildContainer(
-//                     height: 100,
-//                     child: TextField(
-//                       controller: _instrucoesController,
-//                       maxLines: 4,
-//                       decoration: const InputDecoration(
-//                         hintText: 'Digite as instruções da prova',
-//                         hintStyle: TextStyle(
-//                           color: Colors.black54,
-//                           fontSize: 16,
-//                           fontWeight: FontWeight.w300,
-//                         ),
-//                         border: InputBorder.none,
-//                         contentPadding: EdgeInsets.symmetric(
-//                           horizontal: 16,
-//                           vertical: 12,
-//                         ),
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 32),
+                        // *** CAMPO CONTEÚDO ***
+                        const Text(
+                          'Conteúdo (Opcional)',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _conteudoSelecionado,
+                              hint: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  _materiaSelecionada == null
+                                      ? 'Selecione uma matéria primeiro'
+                                      : 'Selecione o conteúdo (se houver)',
+                                  style: const TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w300,
+                                  ),
+                                ),
+                              ),
+                              // Popula com a lista de conteúdos filtrados
+                              items:
+                                  _conteudosFiltrados.map((Content conteudo) {
+                                return DropdownMenuItem<String>(
+                                  value: conteudo.id,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Text(conteudo.description),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: _materiaSelecionada != null
+                                  ? (String? newValue) {
+                                      setState(() {
+                                        _conteudoSelecionado = newValue;
+                                      });
+                                    }
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
 
-//                   // Botões de Ação
-//                   Center(
-//                     child: Row(
-//                       mainAxisSize: MainAxisSize.min,
-//                       children: [
-//                         ElevatedButton(
-//                           onPressed: _isLoading ? null : _selecionarQuestoes,
-//                           style: ElevatedButton.styleFrom(
-//                             backgroundColor: _primaryColor,
-//                             foregroundColor: _whiteColor,
-//                             padding: const EdgeInsets.symmetric(
-//                               horizontal: 32,
-//                               vertical: 16,
-//                             ),
-//                             shape: RoundedRectangleBorder(
-//                               borderRadius: BorderRadius.circular(10),
-//                             ),
-//                             elevation: 4,
-//                           ),
-//                           child: _isLoading
-//                               ? const SizedBox(
-//                                   width: 20,
-//                                   height: 20,
-//                                   child: CircularProgressIndicator(
-//                                     strokeWidth: 2,
-//                                     valueColor: AlwaysStoppedAnimation<Color>(
-//                                       Colors.white,
-//                                     ),
-//                                   ),
-//                                 )
-//                               : const Text(
-//                                   'Selecionar Questões',
-//                                   style: TextStyle(
-//                                     fontSize: 16,
-//                                     fontWeight: FontWeight.bold,
-//                                   ),
-//                                 ),
-//                         ),
-//                       ],
-//                     ),
-//                   ),
-//                   const SizedBox(height: 32),
-//                 ],
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+                        // Botão de Ação
+                        Center(
+                          child: ElevatedButton(
+                            onPressed:
+                                _isLoading ? null : _selecionarQuestoes,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primaryColor,
+                              foregroundColor: _whiteColor,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 4,
+                            ),
+                            child: const Text(
+                              'Selecionar Questões',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -59,6 +59,10 @@ class SubjectService {
     return _subjectsRef.onValue;
   }
 
+  Stream<DatabaseEvent> getSubjectsStream() {
+    return _subjectsRef.onValue;
+  }
+
   Stream<DatabaseEvent> getSubjectsBySemesterStream(int semester) {
     final query = _subjectsRef.orderByChild('semester').equalTo(semester);
     return query.onValue;

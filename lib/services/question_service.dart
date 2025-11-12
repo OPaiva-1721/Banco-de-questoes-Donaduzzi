@@ -11,14 +11,14 @@ class QuestionService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   late final DatabaseReference _questionsRef;
   late final DatabaseReference _subjectsRef;
-  late final DatabaseReference _contentsRef; // NOVO
+  late final DatabaseReference _contentsRef; 
   late final DatabaseReference _examsRef;
   final SecurityService _securityService = SecurityService();
 
   QuestionService() {
     _questionsRef = _database.ref('questions');
     _subjectsRef = _database.ref('subjects');
-    _contentsRef = _database.ref('contents'); // NOVO
+    _contentsRef = _database.ref('contents');
     _examsRef = _database.ref('exams');
   }
 
