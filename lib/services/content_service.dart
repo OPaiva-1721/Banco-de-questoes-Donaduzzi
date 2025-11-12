@@ -2,7 +2,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'security_service.dart';
 import 'dart:async';
-import '../models/content_model.dart'; // Importa o modelo que criamos
+import '../models/content_model.dart'; 
 
 class ContentService {
   final FirebaseDatabase _database = FirebaseDatabase.instance;
@@ -57,6 +57,9 @@ class ContentService {
     }
   }
 
+  Stream<DatabaseEvent> getContentStream() {
+    return _contentRef.onValue;
+  }
   /// Returns a Stream of Content objects filtered by subjectId.
   Stream<List<Content>> getContentBySubjectStream(String subjectId) {
     final query = _contentRef.orderByChild('subjectId').equalTo(subjectId);

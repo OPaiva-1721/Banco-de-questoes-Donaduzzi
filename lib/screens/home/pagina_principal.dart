@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../professor/provas_geradas_screen.dart';
 import 'package:prova/screens/professor/banco_questoes/banco_questoes_menu_screen.dart';
 import 'package:prova/screens/professor/conteudo/gerenciar_conteudos_screen.dart';
 import '../../utils/message_utils.dart';
@@ -294,10 +295,10 @@ class TelaInicio extends StatelessWidget {
   }
 
   void _navegarParaCriarProva(BuildContext context) {
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(builder: (context) => const CriarProvaScreen()),
-    // );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CriarProvaScreen()),
+    );
   }
 
   void _navegarParaBancoQuestoes(BuildContext context) {
@@ -308,11 +309,12 @@ class TelaInicio extends StatelessWidget {
   }
 
   void _navegarParaProvasGeradas(BuildContext context) {
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
-    // );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
+    );
   }
+  
 
   void _navegarParaDisciplinas(BuildContext context) {
     Navigator.push(
