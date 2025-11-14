@@ -63,7 +63,7 @@ class _GerenciarCursosScreenState extends State<GerenciarCursosScreen> {
         setState(() {
           _isLoading = false;
         });
-        MessageUtils.mostrarErro(context, 'Erro ao carregar cursos: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -92,21 +92,14 @@ class _GerenciarCursosScreenState extends State<GerenciarCursosScreen> {
 
     if (confirmacao == true && curso.id != null) {
       try {
-        final sucesso = await _courseService.deleteCourse(curso.id!);
+        await _courseService.deleteCourse(curso.id!);
         if (mounted) {
-          if (sucesso) {
-            MessageUtils.mostrarSucesso(context, 'Curso apagado com sucesso!');
-            await _carregarCursos();
-          } else {
-            MessageUtils.mostrarErro(
-              context,
-              'Erro ao apagar curso. Pode estar em uso.',
-            );
-          }
+          MessageUtils.mostrarSucesso(context, 'Curso apagado com sucesso!');
+          await _carregarCursos();
         }
       } catch (e) {
         if (mounted) {
-          MessageUtils.mostrarErro(context, 'Erro ao apagar curso: $e');
+          MessageUtils.mostrarErroFormatado(context, e);
         }
       }
     }

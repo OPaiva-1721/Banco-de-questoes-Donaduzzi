@@ -6,6 +6,7 @@ import '../../../services/question_service.dart';
 import '../../../services/subject_service.dart';
 import '../../../services/content_service.dart';
 import '../../../utils/message_utils.dart';
+import '../../../core/exceptions/app_exceptions.dart';
 import 'adicionar_questao_screen.dart';
 import 'editar_questao_screen.dart';
 
@@ -50,7 +51,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
       await Future.wait([_carregarDisciplinas(), _carregarQuestoes()]);
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {
@@ -78,7 +79,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -105,7 +106,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar conteúdos: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -121,7 +122,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar questões: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -213,21 +214,17 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
 
     if (confirmacao == true && questao.id != null) {
       try {
-        final sucesso = await _questionService.deleteQuestion(questao.id!);
+        await _questionService.deleteQuestion(questao.id!);
         if (mounted) {
-          if (sucesso) {
-            MessageUtils.mostrarSucesso(
-              context,
-              'Questão apagada com sucesso!',
-            );
-            await _carregarQuestoes();
-          } else {
-            MessageUtils.mostrarErro(context, 'Erro ao apagar questão');
-          }
+          MessageUtils.mostrarSucesso(
+            context,
+            'Questão apagada com sucesso!',
+          );
+          await _carregarQuestoes();
         }
       } catch (e) {
         if (mounted) {
-          MessageUtils.mostrarErro(context, 'Erro ao apagar questão: $e');
+          MessageUtils.mostrarErroFormatado(context, e);
         }
       }
     }

@@ -65,19 +65,15 @@ class _EditarConteudoScreenState extends State<EditarConteudoScreen> {
       );
 
       if (mounted) {
-        if (sucesso) {
-          MessageUtils.mostrarSucesso(
-            context,
-            'Conteúdo atualizado com sucesso!',
-          );
-          Navigator.pop(context, true);
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao atualizar conteúdo');
-        }
+        MessageUtils.mostrarSucesso(
+          context,
+          'Conteúdo atualizado com sucesso!',
+        );
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao atualizar conteúdo: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {

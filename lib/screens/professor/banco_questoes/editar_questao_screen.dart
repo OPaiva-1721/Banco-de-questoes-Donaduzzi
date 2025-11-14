@@ -8,6 +8,7 @@ import '../../../services/question_service.dart';
 import '../../../services/subject_service.dart';
 import '../../../services/content_service.dart';
 import '../../../utils/message_utils.dart';
+import '../../../core/exceptions/app_exceptions.dart';
 
 class EditarQuestaoScreen extends StatefulWidget {
   final Question questao;
@@ -118,7 +119,7 @@ class _EditarQuestaoScreenState extends State<EditarQuestaoScreen> {
         setState(() {
           _isLoading = false;
         });
-        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -136,7 +137,7 @@ class _EditarQuestaoScreenState extends State<EditarQuestaoScreen> {
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar conteúdos: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -209,22 +210,18 @@ class _EditarQuestaoScreenState extends State<EditarQuestaoScreen> {
             : _explicacaoController.text.trim(),
       );
 
-      final sucesso = await _questionService.updateQuestion(questaoAtualizada);
+      await _questionService.updateQuestion(questaoAtualizada);
 
       if (mounted) {
-        if (sucesso) {
-          MessageUtils.mostrarSucesso(
-            context,
-            'Questão atualizada com sucesso!',
-          );
-          Navigator.pop(context, true);
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao atualizar questão');
-        }
+        MessageUtils.mostrarSucesso(
+          context,
+          'Questão atualizada com sucesso!',
+        );
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao atualizar questão: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {

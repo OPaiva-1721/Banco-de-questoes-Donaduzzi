@@ -138,8 +138,7 @@ class FirebaseService {
   // ...
 
   // ========== QUESTIONS (Delegation to QuestionService) ==========
-  // (Esta parte permanece igual)
-  Future<String?> createQuestion(Question newQuestion) {
+  Future<String> createQuestion(Question newQuestion) {
     return _questionService.createQuestion(newQuestion);
   }
 
@@ -151,14 +150,13 @@ class FirebaseService {
     return _questionService.getQuestionsBySubjectStream(subjectId);
   }
 
-  Future<bool> deleteQuestion(String questionId) {
+  Future<void> deleteQuestion(String questionId) {
     return _questionService.deleteQuestion(questionId);
   }
   // ...
 
   // ========== EXAMS (Delegation to ExamService) ==========
-  // (Esta parte permanece igual)
-  Future<String?> createExam({
+  Future<String> createExam({
     required String title,
     required String instructions,
     String? subjectId,
@@ -170,7 +168,7 @@ class FirebaseService {
     );
   }
 
-  Future<bool> addQuestionToExam({
+  Future<void> addQuestionToExam({
     required String examId,
     required String questionId,
     required int number,
@@ -188,6 +186,14 @@ class FirebaseService {
 
   Stream<DatabaseEvent> getExamsStream() {
     return _examService.getExamsStream();
+  }
+
+  Future<void> deleteExam(String examId) {
+    return _examService.deleteExam(examId);
+  }
+
+  Future<void> updateExam(String examId, Map<String, dynamic> updateData) {
+    return _examService.updateExam(examId, updateData);
   }
 
   // ...

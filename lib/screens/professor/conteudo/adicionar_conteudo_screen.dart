@@ -57,16 +57,12 @@ class _AdicionarConteudoScreenState extends State<AdicionarConteudoScreen> {
       );
 
       if (mounted) {
-        if (conteudoId != null) {
-          MessageUtils.mostrarSucesso(context, 'Conteúdo criado com sucesso!');
-          Navigator.pop(context, true);
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao criar conteúdo');
-        }
+        MessageUtils.mostrarSucesso(context, 'Conteúdo criado com sucesso!');
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao criar conteúdo: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {

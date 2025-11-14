@@ -111,7 +111,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
         print('Erro detalhado ao carregar dados: $e'); // Para depuração
       }
     }
@@ -193,15 +193,11 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       final questoesMaps = dados['questoes'] as List<Map<String, dynamic>>;
 
       // ETAPA 1: Criar a "casca" da prova
-      final String? exameId = await _examService.createExam(
+      final String exameId = await _examService.createExam(
         title: dados['titulo'],
         instructions: dados['instrucoes'],
         subjectId: _disciplinaSelecionada, // 'subjectId' é o ID da Disciplina
       );
-
-      if (exameId == null) {
-        throw Exception('Não foi possível obter o ID da nova prova.');
-      }
 
       // ETAPA 2: Salvar o ID do curso na prova (como pedido)
       await _examService.updateExam(exameId, {
@@ -218,16 +214,18 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
             questaoMap['peso'] ?? 0.0; // Pega o peso do map
 
         // Chama o service com o 'peso'
-        final bool success = await _examService.addQuestionToExam(
-          examId: exameId,
-          questionId: questionId,
-          number: order,
-          peso: peso, 
-          suggestedLines: null,
-        );
-
-        if (!success) {
+        try {
+          await _examService.addQuestionToExam(
+            examId: exameId,
+            questionId: questionId,
+            number: order,
+            peso: peso, 
+            suggestedLines: null,
+          );
+        } catch (e) {
           allQuestionsAdded = false;
+          // Log do erro, mas continua tentando adicionar as outras questões
+          print('Erro ao adicionar questão $questionId: $e');
         }
       }
 
@@ -245,7 +243,9 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
 
       Navigator.pop(context, true);
     } catch (e) {
-      MessageUtils.mostrarErro(context, 'Erro ao criar prova: $e');
+      if (mounted) {
+        MessageUtils.mostrarErroFormatado(context, e);
+      }
     } finally {
       if (mounted) {
         setState(() {

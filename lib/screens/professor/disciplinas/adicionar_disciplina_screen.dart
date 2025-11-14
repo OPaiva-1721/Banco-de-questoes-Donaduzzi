@@ -56,19 +56,12 @@ class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
       );
 
       if (mounted) {
-        if (disciplinaId != null) {
-          MessageUtils.mostrarSucesso(
-            context,
-            'Disciplina criada com sucesso!',
-          );
-          Navigator.pop(context, true);
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao criar disciplina');
-        }
+        MessageUtils.mostrarSucesso(context, 'Disciplina criada com sucesso!');
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao criar disciplina: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {

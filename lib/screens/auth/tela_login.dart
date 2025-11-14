@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../home/pagina_principal.dart'; // Sua TelaInicio
 import '../../services/firebase_service.dart'; // Usaremos a fachada
 import '../../utils/message_utils.dart';
-import '../../utils/auth_error_utils.dart';
 import '../../utils/password_validator.dart';
 // Removido: import google_sign_in (não é mais necessário)
 
@@ -61,14 +58,11 @@ class _TelaLoginState extends State<TelaLogin> {
           MessageUtils.mostrarSucesso(context, 'Login realizado com sucesso!');
           // A navegação será feita pelo AuthWrapper
         }
-      } on FirebaseAuthException catch (e) {
-        // Trata erros específicos do Firebase Auth
-        final errorMessage = AuthErrorUtils.getErrorMessage(e);
-        if (mounted) MessageUtils.mostrarErro(context, errorMessage);
       } catch (e) {
-        // Trata outros erros inesperados
-        if (mounted)
-          MessageUtils.mostrarErro(context, 'Erro inesperado: ${e.toString()}');
+        // Trata todos os erros (FirebaseAuthException e outros)
+        if (mounted) {
+          MessageUtils.mostrarErroFormatado(context, e);
+        }
       } finally {
         // Garante que o indicador de carregamento seja removido, mesmo com erro
         if (mounted) {
@@ -107,15 +101,11 @@ class _TelaLoginState extends State<TelaLogin> {
           );
           // O AuthWrapper no main.dart vai detectar a mudança e navegar automaticamente.
         }
-      } on FirebaseAuthException catch (e) {
-        final errorMessage = AuthErrorUtils.getErrorMessage(e);
-        if (mounted) MessageUtils.mostrarErro(context, errorMessage);
       } catch (e) {
-        if (mounted)
-          MessageUtils.mostrarErro(
-            context,
-            'Erro ao criar conta: ${e.toString()}',
-          );
+        // Trata todos os erros (FirebaseAuthException e outros)
+        if (mounted) {
+          MessageUtils.mostrarErroFormatado(context, e);
+        }
       } finally {
         if (mounted) {
           setState(() => _isLoading = false);
@@ -180,15 +170,11 @@ class _TelaLoginState extends State<TelaLogin> {
                     );
                     Navigator.of(context).pop(); // Fecha o diálogo
                   }
-                } on FirebaseAuthException catch (e) {
-                  final errorMessage = AuthErrorUtils.getErrorMessage(e);
-                  if (mounted) MessageUtils.mostrarErro(context, errorMessage);
                 } catch (e) {
-                  if (mounted)
-                    MessageUtils.mostrarErro(
-                      context,
-                      'Erro ao enviar email: ${e.toString()}',
-                    );
+                  // Trata todos os erros (FirebaseAuthException e outros)
+                  if (mounted) {
+                    MessageUtils.mostrarErroFormatado(context, e);
+                  }
                 }
               },
               child: const Text('Enviar'),

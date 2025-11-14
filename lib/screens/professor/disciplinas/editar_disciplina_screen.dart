@@ -71,19 +71,15 @@ class _EditarDisciplinaScreenState extends State<EditarDisciplinaScreen> {
       );
 
       if (mounted) {
-        if (sucesso) {
-          MessageUtils.mostrarSucesso(
-            context,
-            'Disciplina atualizada com sucesso!',
-          );
-          Navigator.pop(context, true);
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao atualizar disciplina');
-        }
+        MessageUtils.mostrarSucesso(
+          context,
+          'Disciplina atualizada com sucesso!',
+        );
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao atualizar disciplina: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {

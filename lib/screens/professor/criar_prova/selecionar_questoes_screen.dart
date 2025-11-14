@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
 import '/models/question_model.dart';
 import '/models/option_model.dart'; 
 import '/models/enums.dart'; 
@@ -109,7 +108,7 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        MessageUtils.mostrarErro(context, 'Erro ao carregar questões: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }

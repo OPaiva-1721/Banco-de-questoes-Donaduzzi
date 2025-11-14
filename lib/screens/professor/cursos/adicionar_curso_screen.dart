@@ -53,16 +53,12 @@ class _AdicionarCursoScreenState extends State<AdicionarCursoScreen> {
       );
 
       if (mounted) {
-        if (cursoId != null) {
-          MessageUtils.mostrarSucesso(context, 'Curso criado com sucesso!');
-          Navigator.pop(context, true);
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao criar curso');
-        }
+        MessageUtils.mostrarSucesso(context, 'Curso criado com sucesso!');
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao criar curso: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {

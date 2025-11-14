@@ -8,6 +8,7 @@ import 'package:prova/services/pdf_service.dart'; //
 import 'package:prova/models/exam_model.dart';
 import 'package:prova/utils/message_utils.dart'; //
 import 'package:prova/core/app_colors.dart';
+import 'package:prova/core/exceptions/app_exceptions.dart';
 
 import 'package:prova/services/course_service.dart';
 import 'package:prova/models/course_model.dart';
@@ -119,7 +120,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
         print('Erro detalhado ao carregar dados: $e');
       }
     }
@@ -138,7 +139,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
       );
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao gerar PDF: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -165,16 +166,14 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
 
     if (confirmar == true) {
       try {
-        final success = await _examService.deleteExam(provaId);
-        if (success && mounted) {
+        await _examService.deleteExam(provaId);
+        if (mounted) {
           MessageUtils.mostrarSucesso(context, 'Prova deletada com sucesso');
           _carregarDados(); // Recarrega os dados
-        } else if (mounted) {
-          MessageUtils.mostrarErro(context, 'Falha ao deletar a prova');
         }
       } catch (e) {
         if (mounted) {
-          MessageUtils.mostrarErro(context, 'Erro: $e');
+          MessageUtils.mostrarErroFormatado(context, e);
         }
       }
     }

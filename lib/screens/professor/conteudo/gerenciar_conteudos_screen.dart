@@ -47,7 +47,7 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {
@@ -78,7 +78,7 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -98,7 +98,7 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar conteúdos: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -127,21 +127,17 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
 
     if (confirmacao == true && conteudo.id != null) {
       try {
-        final sucesso = await _contentService.deleteContent(conteudo.id!);
+        await _contentService.deleteContent(conteudo.id!);
         if (mounted) {
-          if (sucesso) {
-            MessageUtils.mostrarSucesso(
-              context,
-              'Conteúdo apagado com sucesso!',
-            );
-            await _carregarConteudos();
-          } else {
-            MessageUtils.mostrarErro(context, 'Erro ao apagar conteúdo');
-          }
+          MessageUtils.mostrarSucesso(
+            context,
+            'Conteúdo apagado com sucesso!',
+          );
+          await _carregarConteudos();
         }
       } catch (e) {
         if (mounted) {
-          MessageUtils.mostrarErro(context, 'Erro ao apagar conteúdo: $e');
+          MessageUtils.mostrarErroFormatado(context, e);
         }
       }
     }

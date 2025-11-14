@@ -8,6 +8,7 @@ import '../../../models/content_model.dart';
 import '../../../services/question_service.dart';
 import '../../../services/subject_service.dart';
 import '../../../services/content_service.dart';
+import '../../../core/exceptions/app_exceptions.dart';
 import '../../../utils/message_utils.dart';
 
 class AdicionarQuestaoScreen extends StatefulWidget {
@@ -91,7 +92,7 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
         setState(() {
           _isLoading = false;
         });
-        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -110,7 +111,7 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar conteúdos: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -203,16 +204,12 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
       final questaoId = await _questionService.createQuestion(novaQuestao);
 
       if (mounted) {
-        if (questaoId != null) {
-          MessageUtils.mostrarSucesso(context, 'Questão criada com sucesso!');
-          Navigator.pop(context, true);
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao criar questão');
-        }
+        MessageUtils.mostrarSucesso(context, 'Questão criada com sucesso!');
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao criar questão: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {

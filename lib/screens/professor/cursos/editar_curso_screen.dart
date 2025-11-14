@@ -63,16 +63,12 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
       );
 
       if (mounted) {
-        if (sucesso) {
-          MessageUtils.mostrarSucesso(context, 'Curso atualizado com sucesso!');
-          Navigator.pop(context, true);
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao atualizar curso');
-        }
+        MessageUtils.mostrarSucesso(context, 'Curso atualizado com sucesso!');
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao atualizar curso: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     } finally {
       if (mounted) {

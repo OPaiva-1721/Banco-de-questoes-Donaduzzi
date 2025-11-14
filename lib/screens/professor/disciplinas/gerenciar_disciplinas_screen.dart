@@ -64,7 +64,7 @@ class _GerenciarDisciplinasScreenState
         setState(() {
           _isLoading = false;
         });
-        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
+        MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -93,24 +93,17 @@ class _GerenciarDisciplinasScreenState
 
     if (confirmacao == true && disciplina.id != null) {
       try {
-        final sucesso = await _subjectService.deleteSubject(disciplina.id!);
+        await _subjectService.deleteSubject(disciplina.id!);
         if (mounted) {
-          if (sucesso) {
-            MessageUtils.mostrarSucesso(
-              context,
-              'Disciplina apagada com sucesso!',
-            );
-            await _carregarDisciplinas();
-          } else {
-            MessageUtils.mostrarErro(
-              context,
-              'Erro ao apagar disciplina. Pode estar em uso.',
-            );
-          }
+          MessageUtils.mostrarSucesso(
+            context,
+            'Disciplina apagada com sucesso!',
+          );
+          await _carregarDisciplinas();
         }
       } catch (e) {
         if (mounted) {
-          MessageUtils.mostrarErro(context, 'Erro ao apagar disciplina: $e');
+          MessageUtils.mostrarErroFormatado(context, e);
         }
       }
     }
