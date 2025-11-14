@@ -10,7 +10,7 @@ import '/utils/message_utils.dart';
 import '/core/app_colors.dart';
 import '/core/app_constants.dart';
 import 'selecionar_questoes_screen.dart';
-import 'package:firebase_database/firebase_database.dart'; 
+import 'package:firebase_database/firebase_database.dart';
 
 class CriarProvaScreen extends StatefulWidget {
   const CriarProvaScreen({super.key});
@@ -38,12 +38,12 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
 
   // Estados dos dropdowns (IDs)
   String? _cursoSelecionado;
-  String? _materiaSelecionada; 
+  String? _disciplinaSelecionada; // <-- CORRIGIDO
   String? _conteudoSelecionado; 
 
   // Listas de dados (agora usam models)
   List<Course> _cursos = [];
-  List<Discipline> _materias = [];
+  List<Discipline> _disciplinas = []; // <-- CORRIGIDO
   List<Content> _conteudos = [];
 
   // Listas filtradas para os dropdowns
@@ -72,30 +72,30 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     return list;
   }
 
-  /// Carrega Cursos, Matérias e Conteúdos do Firebase
+  /// Carrega Cursos, Disciplinas e Conteúdos do Firebase
   Future<void> _carregarDados() async {
     setState(() => _isLoading = true);
     try {
       // 1. Pega os streams
       final cursosStream = _courseService.getCoursesStream();
-      final materiasStream = _subjectService.getSubjectsStream(); 
+      final disciplinasStream = _subjectService.getSubjectsStream(); // <-- CORRIGIDO (nome variável)
       final conteudosStream = _contentService.getContentStream(); 
 
       // 2. Espera pelo primeiro 'DatabaseEvent' de cada um
       final results = await Future.wait([
         cursosStream.first,
-        materiasStream.first,
+        disciplinasStream.first, // <-- CORRIGIDO (nome variável)
         conteudosStream.first,
       ]);
 
       // 3. Processa o 'snapshot' de cada 'DatabaseEvent'
       final DatabaseEvent courseEvent = results[0];
-      final DatabaseEvent subjectEvent = results[1];
+      final DatabaseEvent subjectEvent = results[1]; // O service ainda retorna o 'subjectEvent'
       final DatabaseEvent contentEvent = results[2];
 
       final List<Course> cursos =
           _processarSnapshot(courseEvent.snapshot, Course.fromSnapshot);
-      final List<Discipline> materias =
+      final List<Discipline> disciplinas = // <-- CORRIGIDO
           _processarSnapshot(subjectEvent.snapshot, Discipline.fromSnapshot);
       final List<Content> conteudos =
           _processarSnapshot(contentEvent.snapshot, Content.fromSnapshot);
@@ -103,7 +103,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       if (mounted) {
         setState(() {
           _cursos = cursos;
-          _materias = materias;
+          _disciplinas = disciplinas; // <-- CORRIGIDO
           _conteudos = conteudos;
           _isLoading = false;
         });
@@ -117,17 +117,17 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     }
   }
 
-  /// Filtra a lista de Conteúdos com base na Matéria (Discipline)
-  void _atualizarConteudos(String? novoIdMateria) {
+  /// Filtra a lista de Conteúdos com base na Disciplina (Discipline)
+  void _atualizarConteudos(String? novoIdDisciplina) { // <-- CORRIGIDO
     setState(() {
-      _materiaSelecionada = novoIdMateria; 
+      _disciplinaSelecionada = novoIdDisciplina; // <-- CORRIGIDO
       _conteudoSelecionado = null; 
-      if (novoIdMateria == null) {
+      if (novoIdDisciplina == null) { // <-- CORRIGIDO
         _conteudosFiltrados = [];
       } else {
-        // Filtra Conteúdos pelo 'subjectId' (ID da Matéria)
+        // Filtra Conteúdos pelo 'subjectId' (ID da Disciplina)
         _conteudosFiltrados = _conteudos
-            .where((conteudo) => conteudo.subjectId == novoIdMateria)
+            .where((conteudo) => conteudo.subjectId == novoIdDisciplina) // <-- CORRIGIDO
             .toList();
       }
     });
@@ -146,8 +146,8 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       MessageUtils.mostrarErro(context, 'Selecione um curso');
       return false;
     }
-    if (_materiaSelecionada == null) {
-      MessageUtils.mostrarErro(context, 'Selecione uma matéria');
+    if (_disciplinaSelecionada == null) { // <-- CORRIGIDO
+      MessageUtils.mostrarErro(context, 'Selecione uma disciplina'); // <-- CORRIGIDO
       return false;
     }
     if (_tituloController.text.trim().isEmpty) {
@@ -170,7 +170,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       MaterialPageRoute(
         builder: (context) => SelecionarQuestoesScreen(
           // Passa os IDs com os nomes corretos dos models:
-          subjectId: _materiaSelecionada!, 
+          subjectId: _disciplinaSelecionada!, // <-- CORRIGIDO
           contentId: _conteudoSelecionado, 
           tituloProva: _tituloController.text.trim(),
           instrucoesProva: _instrucoesController.text.trim(),
@@ -196,7 +196,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       final String? exameId = await _examService.createExam(
         title: dados['titulo'],
         instructions: dados['instrucoes'],
-        subjectId: _materiaSelecionada, // 'subjectId' é o ID da Matéria
+        subjectId: _disciplinaSelecionada, // 'subjectId' é o ID da Disciplina
       );
 
       if (exameId == null) {
@@ -478,9 +478,9 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         ),
                         const SizedBox(height: 32),
 
-                        // *** CAMPO MATÉRIA ***
+                        // *** CAMPO DISCIPLINA ***
                         const Text(
-                          'Matéria (Obrigatório)',
+                          'Disciplina (Obrigatório)', // <-- CORRIGIDO
                           style: TextStyle(
                             color: _textColor,
                             fontFamily: 'Inter-Bold',
@@ -493,11 +493,11 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               isExpanded: true,
-                              value: _materiaSelecionada,
+                              value: _disciplinaSelecionada, // <-- CORRIGIDO
                               hint: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16),
                                 child: Text(
-                                  'Selecione a matéria',
+                                  'Selecione a disciplina', // <-- CORRIGIDO
                                   style: TextStyle(
                                     color: Colors.black54,
                                     fontSize: 16,
@@ -505,15 +505,15 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                   ),
                                 ),
                               ),
-                              // CORREÇÃO: Popula com a lista completa de matérias
-                              items: _materias.map((Discipline materia) {
+                              // CORREÇÃO: Popula com a lista completa de disciplinas
+                              items: _disciplinas.map((Discipline disciplina) { // <-- CORRIGIDO
                                 return DropdownMenuItem<String>(
-                                  value: materia.id,
+                                  value: disciplina.id, // <-- CORRIGIDO
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 16,
                                     ),
-                                    child: Text(materia.name),
+                                    child: Text(disciplina.name), // <-- CORRIGIDO
                                   ),
                                 );
                               }).toList(),
@@ -545,8 +545,8 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 16),
                                 child: Text(
-                                  _materiaSelecionada == null
-                                      ? 'Selecione uma matéria primeiro'
+                                  _disciplinaSelecionada == null // <-- CORRIGIDO
+                                      ? 'Selecione uma disciplina primeiro' // <-- CORRIGIDO
                                       : 'Selecione o conteúdo (se houver)',
                                   style: const TextStyle(
                                     color: Colors.black54,
@@ -568,7 +568,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                   ),
                                 );
                               }).toList(),
-                              onChanged: _materiaSelecionada != null
+                              onChanged: _disciplinaSelecionada != null // <-- CORRIGIDO
                                   ? (String? newValue) {
                                       setState(() {
                                         _conteudoSelecionado = newValue;
