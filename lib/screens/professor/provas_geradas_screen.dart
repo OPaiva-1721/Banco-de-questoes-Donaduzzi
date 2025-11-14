@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import '/services/exam_service.dart';
-import '/models/exam_model.dart';
-import '/core/app_colors.dart';
-import '/utils/message_utils.dart';
-import '/services/pdf_service.dart'; 
-import '/services/course_service.dart';
-import '/services/subject_service.dart';
-import '/models/course_model.dart';
-import '/models/discipline_model.dart';
+import 'dart:async'; // Necessário para o Future.wait
+
+// --- CORREÇÃO: Imports de Raiz ou Pacote ---
+import 'package:prova/services/exam_service.dart';
+import 'package:prova/services/pdf_service.dart'; //
+import 'package:prova/models/exam_model.dart';
+import 'package:prova/utils/message_utils.dart'; //
+import 'package:prova/core/app_colors.dart';
+
+import 'package:prova/services/course_service.dart';
+import 'package:prova/models/course_model.dart';
+import 'package:prova/services/subject_service.dart';
+import 'package:prova/models/discipline_model.dart';
+// ---------------------------
 
 class ProvasGeradasScreen extends StatefulWidget {
   const ProvasGeradasScreen({super.key});
@@ -22,26 +27,30 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
   static const Color _primaryColor = AppColors.primary;
   static const Color _backgroundColor = AppColors.background;
   static const Color _textColor = AppColors.text;
-  static const Color _whiteColor = Colors.white;
+  static const Color _whiteColor = AppColors.white;
 
   // Serviços
   final ExamService _examService = ExamService();
+  
+  // --- ESTADO SIMPLIFICADO ---
   final CourseService _courseService = CourseService();
   final SubjectService _subjectService = SubjectService();
 
-  // Listas de metadados para consulta
-  List<Course> _cursos = [];
-  List<Discipline> _materias = [];
-  bool _isLoadingPdf = false;
-  bool _isLoadingData = true;
+  bool _isLoading = true;
+  List<Exam> _provas = [];
+  
+  // Mapas para consulta de nomes (para o PDF)
+  Map<String, Course> _cursosMap = {};
+  Map<String, Discipline> _disciplinasMap = {};
+  // ---------------------------
 
   @override
   void initState() {
     super.initState();
-    _carregarMetadados();
+    _carregarDados(); 
   }
 
-  /// Processa o DatabaseEvent
+  // Helper para processar dados do Firebase
   List<T> _processarSnapshot<T>(
       DataSnapshot snapshot, T Function(DataSnapshot) fromSnapshot) {
     final list = <T>[];
@@ -56,263 +65,197 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     return list;
   }
 
-  /// Carrega cursos e matérias para podermos exibir os nomes
-  Future<void> _carregarMetadados() async {
-    setState(() => _isLoadingData = true);
+  // --- FUNÇÃO DE CARREGAMENTO SIMPLIFICADA ---
+  Future<void> _carregarDados() async {
+    if (mounted) setState(() => _isLoading = true);
+    
     try {
-      final cursosEvent = await _courseService.getCoursesStream().first;
-      final materiasEvent = await _subjectService.getSubjectsStream().first;
+      // 1. Pega todos os streams necessários
+      final examsStream = _examService.getExamsStream();
+      final coursesStream = _courseService.getCoursesStream();
+      final subjectsStream = _subjectService.getSubjectsStream();
+
+      // 2. Espera por todos os dados
+      final results = await Future.wait([
+        examsStream.first,
+        coursesStream.first,
+        subjectsStream.first,
+      ]);
+
+      // 3. Processa os snapshots
+      final DatabaseEvent examsEvent = results[0];
+      final DatabaseEvent coursesEvent = results[1];
+      final DatabaseEvent subjectsEvent = results[2];
+
+      final List<Exam> tempProvas =
+          _processarSnapshot(examsEvent.snapshot, Exam.fromSnapshot);
+          
+      final List<Course> tempCourses =
+          _processarSnapshot(coursesEvent.snapshot, Course.fromSnapshot);
+      
+      final List<Discipline> tempSubjects =
+          _processarSnapshot(subjectsEvent.snapshot, Discipline.fromSnapshot);
+
+      // 4. Cria os mapas de consulta (para PDF)
+      final Map<String, Course> tempCursosMap = {
+        for (var curso in tempCourses) curso.id!: curso
+      };
+      
+      final Map<String, Discipline> tempDisciplinasMap = {
+        for (var disciplina in tempSubjects) disciplina.id!: disciplina
+      };
+
+      // 5. Ordena as provas
+      tempProvas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       if (mounted) {
         setState(() {
-          _cursos = _processarSnapshot(cursosEvent.snapshot, Course.fromSnapshot);
-          _materias =
-              _processarSnapshot(materiasEvent.snapshot, Discipline.fromSnapshot);
-          _isLoadingData = false;
+          _provas = tempProvas;
+          _cursosMap = tempCursosMap;
+          _disciplinasMap = tempDisciplinasMap;
+          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoadingData = false);
+        setState(() => _isLoading = false);
         MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
+        print('Erro detalhado ao carregar dados: $e');
       }
     }
   }
 
-  /// Busca o nome do Curso pelo ID
-  String _getNomeCurso(String? courseId) {
-    if (courseId == null) return 'Curso não informado';
-    return _cursos
-        .firstWhere((c) => c.id == courseId, orElse: () => Course(id: '', name: '...'))
-        .name;
-  }
-
-  /// Busca o nome da Matéria pelo ID
-  String _getNomeMateria(String subjectId) {
-    return _materias
-        .firstWhere((m) => m.id == subjectId,
-            orElse: () => Discipline(id: '', name: '...', semester: 0))
-        .name;
-  }
-
-  /// Chama o serviço de PDF
+  /// Gera o PDF da prova
   Future<void> _gerarPdf(Exam prova) async {
-    setState(() => _isLoadingPdf = true);
+    final String nomeCurso = _cursosMap[prova.courseId]?.name ?? 'Curso não informado';
+    final String nomeMateria = _disciplinasMap[prova.subjectId]?.name ?? 'Disciplina não informada';
 
     try {
-      final String nomeCurso = _getNomeCurso(prova.courseId);
-      final String nomeMateria = _getNomeMateria(prova.subjectId);
-
-      // (O PdfService fará o resto, incluindo buscar as questões)
       await PdfService.gerarProvaPdf(
         prova: prova,
         nomeCurso: nomeCurso,
         nomeMateria: nomeMateria,
       );
     } catch (e) {
-      MessageUtils.mostrarErro(context, 'Erro ao gerar PDF: $e');
-    } finally {
-      setState(() => _isLoadingPdf = false);
+      if (mounted) {
+        MessageUtils.mostrarErro(context, 'Erro ao gerar PDF: $e');
+      }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              // Header
-              Container(
-                width: double.infinity,
-                height: 100,
-                decoration: const BoxDecoration(
-                  color: _primaryColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      offset: Offset(0, 8),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        width: 196,
-                        height: 67,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 196,
-                            height: 67,
-                            decoration: BoxDecoration(
-                              color: _whiteColor,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'LOGO',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: _primaryColor,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    Positioned(
-                      left: 16,
-                      top: 0,
-                      bottom: 0,
-                      child: Center(
-                        child: IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: _whiteColor,
-                            size: 28,
-                          ),
-                          tooltip: 'Voltar',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Título da Página
-              const Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Text(
-                  'Provas Geradas',
-                  style: TextStyle(
-                    color: _textColor,
-                    fontFamily: 'Inter-Bold',
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
-              // Lista de Provas
-              Expanded(
-                child: _isLoadingData
-                    ? const Center(
-                        child: CircularProgressIndicator(color: _primaryColor))
-                    : StreamBuilder<DatabaseEvent>(
-                        stream: _examService.getExamsStream(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                                child: CircularProgressIndicator(
-                                    color: _primaryColor));
-                          }
-                          if (!snapshot.hasData ||
-                              !snapshot.data!.snapshot.exists) {
-                            return const Center(
-                                child: Text('Nenhuma prova encontrada.'));
-                          }
-
-                          // Processa o snapshot para List<Exam>
-                          final provas = _processarSnapshot(
-                              snapshot.data!.snapshot, Exam.fromSnapshot);
-
-                          // Ordena das mais recentes para as mais antigas
-                          provas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-                          return ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: provas.length,
-                            itemBuilder: (context, index) {
-                              final prova = provas[index];
-                              return _buildExamCard(context, prova);
-                            },
-                          );
-                        },
-                      ),
-              ),
-            ],
+  /// Deleta a prova (com confirmação)
+  Future<void> _deletarProva(String provaId) async {
+    final bool? confirmar = await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar Exclusão'),
+        content: const Text('Tem certeza de que deseja deletar esta prova?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
           ),
-          // Loading overlay para PDF
-          if (_isLoadingPdf)
-            Container(
-              color: Colors.black.withOpacity(0.5),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: _whiteColor),
-                    SizedBox(height: 16),
-                    Text(
-                      'Gerando PDF...',
-                      style: TextStyle(color: _whiteColor, fontSize: 16),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Deletar', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
+
+    if (confirmar == true) {
+      try {
+        final success = await _examService.deleteExam(provaId);
+        if (success && mounted) {
+          MessageUtils.mostrarSucesso(context, 'Prova deletada com sucesso');
+          _carregarDados(); // Recarrega os dados
+        } else if (mounted) {
+          MessageUtils.mostrarErro(context, 'Falha ao deletar a prova');
+        }
+      } catch (e) {
+        if (mounted) {
+          MessageUtils.mostrarErro(context, 'Erro: $e');
+        }
+      }
+    }
   }
 
-  Widget _buildExamCard(BuildContext context, Exam prova) {
+  // Card da prova atualizado
+  Widget _buildProvaCard(Exam prova) {
+    
+    // O campo 'createdBy' agora contém o NOME
+    final String nomeAutor = prova.createdBy.isNotEmpty ? prova.createdBy : 'Autor desconhecido';
+    
+    final String nomeCurso = _cursosMap[prova.courseId]?.name ?? '...';
+    final String nomeMateria = _disciplinasMap[prova.subjectId]?.name ?? '...';
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              prova.title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: _textColor,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              Icons.school,
-              _getNomeCurso(prova.courseId), // Mostra o nome do curso
-            ),
-            const SizedBox(height: 8),
-            _buildInfoRow(
-              Icons.book,
-              _getNomeMateria(prova.subjectId), // Mostra o nome da matéria
-            ),
-            const SizedBox(height: 8),
-            _buildInfoRow(
-              Icons.list_alt,
-              '${prova.questions.length} questões',
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.picture_as_pdf),
-                label: const Text('Gerar PDF'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  foregroundColor: _whiteColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    prova.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _textColor,
+                    ),
                   ),
-                ),
-                onPressed: _isLoadingPdf ? null : () => _gerarPdf(prova),
+                  const SizedBox(height: 8),
+
+                  // --- NOME DO AUTOR ---
+                  Text(
+                    'Criado por: $nomeAutor',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // --- OUTRAS INFORMAÇÕES ---
+                  Text(
+                    'Curso: $nomeCurso',
+                    style: const TextStyle(fontSize: 14, color: _textColor),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Disciplina: $nomeMateria',
+                    style: const TextStyle(fontSize: 14, color: _textColor),
+                  ),
+                  const SizedBox(height: 4),
+                  // ------------------------------------
+                  
+                  Text(
+                    'Questões: ${prova.questions.length}',
+                    style: const TextStyle(fontSize: 14, color: _textColor),
+                  ),
+                ],
               ),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.picture_as_pdf, color: AppColors.primary),
+                  onPressed: () => _gerarPdf(prova),
+                  tooltip: 'Gerar PDF',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () => _deletarProva(prova.id!),
+                  tooltip: 'Deletar Prova',
+                ),
+              ],
             ),
           ],
         ),
@@ -320,18 +263,120 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey[700]),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(fontSize: 14, color: Colors.grey[800]),
+  @override
+  // --- CORREÇÃO DO ERRO DE DIGITAÇÃO 'BuildContextC' ---
+  Widget build(BuildContext context) {
+  // -------------------------------------------------
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      body: Column(
+        children: [
+          // Header
+          Container(
+            width: double.infinity,
+            height: 100,
+            decoration: const BoxDecoration(
+              color: _primaryColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 8),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 196,
+                    height: 67,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 196,
+                        height: 67,
+                        decoration: BoxDecoration(
+                          color: _whiteColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'LOGO',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _primaryColor,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Positioned(
+                  left: 16,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: _whiteColor,
+                        size: 28,
+                      ),
+                      tooltip: 'Voltar',
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          
+          // Título da Página
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Provas Geradas',
+              style: TextStyle(
+                color: _textColor,
+                fontFamily: 'Inter-Bold',
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
+          // Conteúdo principal
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: _primaryColor))
+                : RefreshIndicator(
+                    onRefresh: _carregarDados, 
+                    color: _primaryColor,
+                    child: _provas.isEmpty
+                        ? Center(
+                            child: Text(
+                              'Nenhuma prova gerada ainda.',
+                              style:
+                                  TextStyle(fontSize: 16, color: Colors.grey[600]),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.only(top: 8, bottom: 16),
+                            itemCount: _provas.length,
+                            itemBuilder: (context, index) {
+                              final prova = _provas[index];
+                              return _buildProvaCard(prova);
+                            },
+                          ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
