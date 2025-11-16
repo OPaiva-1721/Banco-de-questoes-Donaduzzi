@@ -29,8 +29,8 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
   // Serviços
   final ExamService _examService = ExamService();
   final CourseService _courseService = CourseService();
-  final SubjectService _subjectService = SubjectService(); 
-  final ContentService _contentService = ContentService(); 
+  final SubjectService _subjectService = SubjectService();
+  final ContentService _contentService = ContentService();
 
   // Controladores
   final TextEditingController _tituloController = TextEditingController();
@@ -38,12 +38,16 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
 
   // Estados dos dropdowns (IDs)
   String? _cursoSelecionado;
-  String? _disciplinaSelecionada; // <-- CORRIGIDO
-  String? _conteudoSelecionado; 
+  String? _disciplinaSelecionada;
+  
+  // *** ALTERAÇÃO AQUI ***
+  // Agora é uma lista para seleção múltipla de conteúdos
+  // Esta lista é de 'String' (não-anulável)
+  List<String> _conteudosSelecionados = [];
 
   // Listas de dados (agora usam models)
   List<Course> _cursos = [];
-  List<Discipline> _disciplinas = []; // <-- CORRIGIDO
+  List<Discipline> _disciplinas = [];
   List<Content> _conteudos = [];
 
   // Listas filtradas para os dropdowns
@@ -78,24 +82,24 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     try {
       // 1. Pega os streams
       final cursosStream = _courseService.getCoursesStream();
-      final disciplinasStream = _subjectService.getSubjectsStream(); // <-- CORRIGIDO (nome variável)
-      final conteudosStream = _contentService.getContentStream(); 
+      final disciplinasStream = _subjectService.getSubjectsStream();
+      final conteudosStream = _contentService.getContentStream();
 
       // 2. Espera pelo primeiro 'DatabaseEvent' de cada um
       final results = await Future.wait([
         cursosStream.first,
-        disciplinasStream.first, // <-- CORRIGIDO (nome variável)
+        disciplinasStream.first,
         conteudosStream.first,
       ]);
 
       // 3. Processa o 'snapshot' de cada 'DatabaseEvent'
       final DatabaseEvent courseEvent = results[0];
-      final DatabaseEvent subjectEvent = results[1]; // O service ainda retorna o 'subjectEvent'
+      final DatabaseEvent subjectEvent = results[1];
       final DatabaseEvent contentEvent = results[2];
 
       final List<Course> cursos =
           _processarSnapshot(courseEvent.snapshot, Course.fromSnapshot);
-      final List<Discipline> disciplinas = // <-- CORRIGIDO
+      final List<Discipline> disciplinas =
           _processarSnapshot(subjectEvent.snapshot, Discipline.fromSnapshot);
       final List<Content> conteudos =
           _processarSnapshot(contentEvent.snapshot, Content.fromSnapshot);
@@ -103,7 +107,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       if (mounted) {
         setState(() {
           _cursos = cursos;
-          _disciplinas = disciplinas; // <-- CORRIGIDO
+          _disciplinas = disciplinas;
           _conteudos = conteudos;
           _isLoading = false;
         });
@@ -118,16 +122,20 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
   }
 
   /// Filtra a lista de Conteúdos com base na Disciplina (Discipline)
-  void _atualizarConteudos(String? novoIdDisciplina) { // <-- CORRIGIDO
+  void _atualizarConteudos(String? novoIdDisciplina) {
     setState(() {
-      _disciplinaSelecionada = novoIdDisciplina; // <-- CORRIGIDO
-      _conteudoSelecionado = null; 
-      if (novoIdDisciplina == null) { // <-- CORRIGIDO
+      _disciplinaSelecionada = novoIdDisciplina;
+      
+      // *** ALTERAÇÃO AQUI ***
+      // Limpa a lista de selecionados ao trocar a disciplina
+      _conteudosSelecionados.clear(); 
+      
+      if (novoIdDisciplina == null) {
         _conteudosFiltrados = [];
       } else {
         // Filtra Conteúdos pelo 'subjectId' (ID da Disciplina)
         _conteudosFiltrados = _conteudos
-            .where((conteudo) => conteudo.subjectId == novoIdDisciplina) // <-- CORRIGIDO
+            .where((conteudo) => conteudo.subjectId == novoIdDisciplina)
             .toList();
       }
     });
@@ -146,8 +154,8 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       MessageUtils.mostrarErro(context, 'Selecione um curso');
       return false;
     }
-    if (_disciplinaSelecionada == null) { // <-- CORRIGIDO
-      MessageUtils.mostrarErro(context, 'Selecione uma disciplina'); // <-- CORRIGIDO
+    if (_disciplinaSelecionada == null) {
+      MessageUtils.mostrarErro(context, 'Selecione uma disciplina');
       return false;
     }
     if (_tituloController.text.trim().isEmpty) {
@@ -169,9 +177,14 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => SelecionarQuestoesScreen(
-          // Passa os IDs com os nomes corretos dos models:
-          subjectId: _disciplinaSelecionada!, // <-- CORRIGIDO
-          contentId: _conteudoSelecionado, 
+          subjectId: _disciplinaSelecionada!,
+          
+          // *** ESTA É A LINHA CORRIGIDA ***
+          // Agora envia 'contentIds' (plural) com a lista.
+          contentIds: _conteudosSelecionados.isEmpty
+              ? null // Envia nulo se vazio (para carregar tudo da disciplina)
+              : List.from(_conteudosSelecionados),
+
           tituloProva: _tituloController.text.trim(),
           instrucoesProva: _instrucoesController.text.trim(),
         ),
@@ -199,11 +212,11 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
         subjectId: _disciplinaSelecionada, // 'subjectId' é o ID da Disciplina
       );
 
-      // ETAPA 2: Salvar o ID do curso na prova (como pedido)
+      // ETAPA 2: Salvar o ID do curso E CONTEÚDOS na prova (como pedido)
       await _examService.updateExam(exameId, {
         'courseId': _cursoSelecionado,
+        'contentIds': _conteudosSelecionados,
       });
-
       // ETAPA 3: Adicionar as questões à prova, uma por uma
       bool allQuestionsAdded = true;
       for (int i = 0; i < questoesMaps.length; i++) {
@@ -219,7 +232,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
             examId: exameId,
             questionId: questionId,
             number: order,
-            peso: peso, 
+            peso: peso,
             suggestedLines: null,
           );
         } catch (e) {
@@ -258,7 +271,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
   Widget _buildContainer({required Widget child, double? height}) {
     return Container(
       width: double.infinity,
-      height: height ?? 50,
+      height: height, // Altura automática (nula) permite o ExpansionTile crescer
       decoration: BoxDecoration(
         color: _whiteColor,
         borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
@@ -441,8 +454,9 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildContainer(
+                          height: 50, // Altura fixa para dropdown
                           child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
+                            child: DropdownButton<String?>( // Tipo anulável
                               isExpanded: true,
                               value: _cursoSelecionado,
                               hint: const Padding(
@@ -457,7 +471,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                 ),
                               ),
                               items: _cursos.map((Course curso) {
-                                return DropdownMenuItem<String>(
+                                return DropdownMenuItem<String?>( // Tipo anulável
                                   value: curso.id,
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
@@ -468,7 +482,6 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                 );
                               }).toList(),
                               onChanged: (String? newValue) {
-                                // CORREÇÃO: Apenas define o estado
                                 setState(() {
                                   _cursoSelecionado = newValue;
                                 });
@@ -480,7 +493,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
 
                         // *** CAMPO DISCIPLINA ***
                         const Text(
-                          'Disciplina (Obrigatório)', // <-- CORRIGIDO
+                          'Disciplina (Obrigatório)',
                           style: TextStyle(
                             color: _textColor,
                             fontFamily: 'Inter-Bold',
@@ -490,14 +503,15 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildContainer(
+                          height: 50, // Altura fixa para dropdown
                           child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
+                            child: DropdownButton<String?>( // Tipo anulável
                               isExpanded: true,
-                              value: _disciplinaSelecionada, // <-- CORRIGIDO
+                              value: _disciplinaSelecionada,
                               hint: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16),
                                 child: Text(
-                                  'Selecione a disciplina', // <-- CORRIGIDO
+                                  'Selecione a disciplina',
                                   style: TextStyle(
                                     color: Colors.black54,
                                     fontSize: 16,
@@ -505,15 +519,14 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                   ),
                                 ),
                               ),
-                              // CORREÇÃO: Popula com a lista completa de disciplinas
-                              items: _disciplinas.map((Discipline disciplina) { // <-- CORRIGIDO
-                                return DropdownMenuItem<String>(
-                                  value: disciplina.id, // <-- CORRIGIDO
+                              items: _disciplinas.map((Discipline disciplina) {
+                                return DropdownMenuItem<String?>( // Tipo anulável
+                                  value: disciplina.id,
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 16,
                                     ),
-                                    child: Text(disciplina.name), // <-- CORRIGIDO
+                                    child: Text(disciplina.name),
                                   ),
                                 );
                               }).toList(),
@@ -525,7 +538,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         ),
                         const SizedBox(height: 32),
 
-                        // *** CAMPO CONTEÚDO ***
+                        // *** CAMPO CONTEÚDO (MÚLTIPLA SELEÇÃO) ***
                         const Text(
                           'Conteúdo (Opcional)',
                           style: TextStyle(
@@ -537,45 +550,51 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         ),
                         const SizedBox(height: 16),
                         _buildContainer(
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              isExpanded: true,
-                              value: _conteudoSelecionado,
-                              hint: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 16),
-                                child: Text(
-                                  _disciplinaSelecionada == null // <-- CORRIGIDO
-                                      ? 'Selecione uma disciplina primeiro' // <-- CORRIGIDO
-                                      : 'Selecione o conteúdo (se houver)',
-                                  style: const TextStyle(
-                                    color: Colors.black54,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w300,
-                                  ),
-                                ),
+                          // A altura agora é nula (automática) para o ExpansionTile
+                          height: null, 
+                          child: ExpansionTile(
+                            title: Text(
+                              _conteudosSelecionados.isEmpty
+                                  ? (_disciplinaSelecionada == null
+                                      ? 'Selecione uma disciplina primeiro'
+                                      : 'Selecione os conteúdos (opcional)')
+                                  : '${_conteudosSelecionados.length} conteúdo(s) selecionado(s)',
+                              style: TextStyle(
+                                color: _conteudosSelecionados.isEmpty && _disciplinaSelecionada != null
+                                    ? Colors.black54
+                                    : (_disciplinaSelecionada == null ? Colors.grey : _textColor),
+                                fontSize: 16,
+                                fontWeight: _conteudosSelecionados.isEmpty
+                                    ? FontWeight.w300
+                                    : FontWeight.normal,
                               ),
-                              // Popula com a lista de conteúdos filtrados
-                              items:
-                                  _conteudosFiltrados.map((Content conteudo) {
-                                return DropdownMenuItem<String>(
-                                  value: conteudo.id,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                    ),
-                                    child: Text(conteudo.description),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: _disciplinaSelecionada != null // <-- CORRIGIDO
-                                  ? (String? newValue) {
-                                      setState(() {
-                                        _conteudoSelecionado = newValue;
-                                      });
-                                    }
-                                  : null,
                             ),
+                            
+                            // *** INÍCIO DA CORREÇÃO ***
+                            children: _disciplinaSelecionada == null
+                                ? [] // Não mostra nada se a disciplina não estiver selecionada
+                                : _conteudosFiltrados
+                                    .where((c) => c.id != null) // 1. Filtra IDs nulos
+                                    .map((Content conteudo) {
+                                      // 2. Agora temos certeza que conteudo.id não é nulo
+                                      final String contentId = conteudo.id!; 
+
+                                      return CheckboxListTile(
+                                        title: Text(conteudo.description),
+                                        // 3. Usa a variável não-anulável 'contentId'
+                                        value: _conteudosSelecionados.contains(contentId),
+                                        onChanged: (bool? value) {
+                                          setState(() {
+                                            if (value == true) {
+                                              _conteudosSelecionados.add(contentId);
+                                            } else {
+                                              _conteudosSelecionados.remove(contentId);
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                            // *** FIM DA CORREÇÃO ***
                           ),
                         ),
                         const SizedBox(height: 32),

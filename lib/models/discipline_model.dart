@@ -1,6 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
 
-/// Modelo para `Discipline` (Disciplina, sua tabela 'Subject')
 class Discipline {
   final String? id;
   final String name;
@@ -24,7 +23,7 @@ class Discipline {
     final data = _dataToMap(snapshot);
     return Discipline(
       id: snapshot.key,
-      name: data['name'] ?? '',
+      name: data['name']?.toString() ?? '',
       semester: (data['semester'] as num?)?.toInt() ?? 1,
     );
   }
