@@ -113,13 +113,17 @@ class Exam {
       parsedCreatedAt = DateTime.now();
     }
 
+    // Lê o campo createdBy do banco (pode ser String ou null)
+    final createdByValue = data['createdBy'];
+    final createdByString = createdByValue?.toString().trim() ?? '';
+    
     return Exam(
       id: snapshot.key, 
       title: data['title']?.toString() ?? 'Título Padrão',
       instructions: data['instructions']?.toString() ?? '',
       subjectId: data['subjectId']?.toString() ?? '',
       courseId: data['courseId']?.toString() ?? '',
-      createdBy: data['createdBy']?.toString() ?? '',
+      createdBy: createdByString,
       createdAt: parsedCreatedAt, 
       questions: parsedQuestions,
       contentIds: parsedContentIds, 
