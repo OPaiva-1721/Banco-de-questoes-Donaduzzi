@@ -1,25 +1,36 @@
 import 'package:flutter/material.dart';
-import '/services/exam_service.dart';
-import '/models/course_model.dart';
-import '/models/discipline_model.dart';
-import '/models/content_model.dart';
-import '/services/course_service.dart';
-import '/services/subject_service.dart';
-import '/services/content_service.dart';
-import '/utils/message_utils.dart';
-import '/core/app_colors.dart';
-import '/core/app_constants.dart';
-import 'selecionar_questoes_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
 
-class CriarProvaScreen extends StatefulWidget {
-  const CriarProvaScreen({super.key});
+// Imports dos Models
+import 'package:prova/models/exam_model.dart';
+import 'package:prova/models/course_model.dart';
+import 'package:prova/models/discipline_model.dart';
+import 'package:prova/models/content_model.dart';
+import 'package:prova/models/exam_question_link_model.dart';
+
+// Imports dos Services
+import 'package:prova/services/exam_service.dart';
+import 'package:prova/services/course_service.dart';
+import 'package:prova/services/subject_service.dart';
+import 'package:prova/services/content_service.dart';
+
+// Imports de UI e Utils
+import 'package:prova/utils/message_utils.dart';
+import 'package:prova/core/app_colors.dart';
+import 'package:prova/core/app_constants.dart';
+import 'package:prova/screens/professor/criar_prova/selecionar_questoes_screen.dart';
+
+class EditarProvaScreen extends StatefulWidget {
+  // Recebe a prova que será editada
+  final Exam prova;
+
+  const EditarProvaScreen({super.key, required this.prova});
 
   @override
-  State<CriarProvaScreen> createState() => _CriarProvaScreenState();
+  State<EditarProvaScreen> createState() => _EditarProvaScreenState();
 }
 
-class _CriarProvaScreenState extends State<CriarProvaScreen> {
+class _EditarProvaScreenState extends State<EditarProvaScreen> {
   // Constantes de cores
   static const Color _primaryColor = AppColors.primary;
   static const Color _backgroundColor = AppColors.background;
@@ -39,12 +50,12 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
   // Estados dos dropdowns (IDs)
   String? _cursoSelecionado;
   String? _disciplinaSelecionada;
-  
-  // Agora é uma lista para seleção múltipla de conteúdos
-  // Esta lista é de 'String' (não-anulável)
   List<String> _conteudosSelecionados = [];
 
-  // Listas de dados (agora usam models)
+  // Guarda o ID original para lógica de seleção de questões
+  late String _disciplinaOriginalId;
+
+  // Listas de dados (models)
   List<Course> _cursos = [];
   List<Discipline> _disciplinas = [];
   List<Content> _conteudos = [];
@@ -57,18 +68,38 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
   @override
   void initState() {
     super.initState();
+    _preencherDadosIniciais();
     _carregarDados();
   }
 
-  /// HELPER para processar o DatabaseEvent
+  /// Pré-preenche os campos com os dados da prova existente
+  void _preencherDadosIniciais() {
+    final prova = widget.prova;
+    _tituloController.text = prova.title;
+    _instrucoesController.text = prova.instructions;
+    _cursoSelecionado = prova.courseId;
+    _disciplinaSelecionada = prova.subjectId;
+    _conteudosSelecionados = List<String>.from(prova.contentIds);
+
+    // Salva o ID original
+    _disciplinaOriginalId = prova.subjectId;
+  }
+
+  /// Helper para processar o DatabaseEvent
   List<T> _processarSnapshot<T>(
-      DataSnapshot snapshot, T Function(DataSnapshot) fromSnapshot) {
+    DataSnapshot snapshot,
+    T Function(DataSnapshot) fromSnapshot,
+  ) {
     final list = <T>[];
     if (snapshot.exists && snapshot.value != null) {
       final data = snapshot.value;
       if (data is Map) {
         for (final childSnapshot in snapshot.children) {
-          list.add(fromSnapshot(childSnapshot));
+          try {
+            list.add(fromSnapshot(childSnapshot));
+          } catch (e) {
+            print('Erro ao processar item ${childSnapshot.key}: $e');
+          }
         }
       }
     }
@@ -79,29 +110,32 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
   Future<void> _carregarDados() async {
     setState(() => _isLoading = true);
     try {
-      // 1. Pega os streams
       final cursosStream = _courseService.getCoursesStream();
       final disciplinasStream = _subjectService.getSubjectsStream();
       final conteudosStream = _contentService.getContentStream();
 
-      // 2. Espera pelo primeiro 'DatabaseEvent' de cada um
       final results = await Future.wait([
         cursosStream.first,
         disciplinasStream.first,
         conteudosStream.first,
       ]);
 
-      // 3. Processa o 'snapshot' de cada 'DatabaseEvent'
       final DatabaseEvent courseEvent = results[0];
       final DatabaseEvent subjectEvent = results[1];
       final DatabaseEvent contentEvent = results[2];
 
-      final List<Course> cursos =
-          _processarSnapshot(courseEvent.snapshot, Course.fromSnapshot);
-      final List<Discipline> disciplinas =
-          _processarSnapshot(subjectEvent.snapshot, Discipline.fromSnapshot);
-      final List<Content> conteudos =
-          _processarSnapshot(contentEvent.snapshot, Content.fromSnapshot);
+      final List<Course> cursos = _processarSnapshot(
+        courseEvent.snapshot,
+        Course.fromSnapshot,
+      );
+      final List<Discipline> disciplinas = _processarSnapshot(
+        subjectEvent.snapshot,
+        Discipline.fromSnapshot,
+      );
+      final List<Content> conteudos = _processarSnapshot(
+        contentEvent.snapshot,
+        Content.fromSnapshot,
+      );
 
       if (mounted) {
         setState(() {
@@ -110,29 +144,33 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
           _conteudos = conteudos;
           _isLoading = false;
         });
+        // Atualiza a lista de conteúdos com base na disciplina já selecionada
+        _atualizarConteudos(_disciplinaSelecionada, manterSelecao: true);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         MessageUtils.mostrarErroFormatado(context, e);
-        print('Erro detalhado ao carregar dados: $e'); // Para depuração
       }
     }
   }
 
-  /// Filtra a lista de Conteúdos com base na Disciplina (Discipline)
-  void _atualizarConteudos(String? novoIdDisciplina) {
+  /// Filtra a lista de Conteúdos com base na Disciplina
+  void _atualizarConteudos(
+    String? novoIdDisciplina, {
+    bool manterSelecao = false,
+  }) {
     setState(() {
       _disciplinaSelecionada = novoIdDisciplina;
-      
-      // *** ALTERAÇÃO AQUI ***
-      // Limpa a lista de selecionados ao trocar a disciplina
-      _conteudosSelecionados.clear(); 
-      
+
+      // Se a disciplina mudou (e não é a carga inicial), limpa os conteúdos
+      if (!manterSelecao) {
+        _conteudosSelecionados.clear();
+      }
+
       if (novoIdDisciplina == null) {
         _conteudosFiltrados = [];
       } else {
-        // Filtra Conteúdos pelo 'subjectId' (ID da Disciplina)
         _conteudosFiltrados = _conteudos
             .where((conteudo) => conteudo.subjectId == novoIdDisciplina)
             .toList();
@@ -168,35 +206,42 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     return true;
   }
 
-  /// Navega para a tela de seleção de questões
-  Future<void> _selecionarQuestoes() async {
+  /// Navega para a tela de seleção de questões (modo edição)
+  Future<void> _editarQuestoes() async {
     if (!_validarFormulario()) return;
+
+    // Verifica se a disciplina foi alterada
+    final bool disciplinaMudou =
+        _disciplinaSelecionada != _disciplinaOriginalId;
 
     final resultado = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => SelecionarQuestoesScreen(
           subjectId: _disciplinaSelecionada!,
-          
-          // *** ESTA É A LINHA CORRIGIDA ***
-          // Agora envia 'contentIds' (plural) com a lista.
           contentIds: _conteudosSelecionados.isEmpty
-              ? null // Envia nulo se vazio (para carregar tudo da disciplina)
+              ? null
               : List.from(_conteudosSelecionados),
-
           tituloProva: _tituloController.text.trim(),
           instrucoesProva: _instrucoesController.text.trim(),
+
+          // Se a disciplina mudou, passa uma lista vazia para forçar nova seleção
+          // Se não mudou, passa as questões originais
+          questoesIniciais: disciplinaMudou
+              ? []
+              : List<ExamQuestionLink>.from(widget.prova.questions),
         ),
       ),
     );
 
+    // Se o usuário concluiu a seleção (resultado != null)
     if (resultado != null && resultado is Map<String, dynamic>) {
-      await _criarProvaComQuestoes(resultado);
+      await _salvarAlteracoes(resultado);
     }
   }
 
-  /// Cria a prova com as questões selecionadas
-  Future<void> _criarProvaComQuestoes(Map<String, dynamic> dados) async {
+  /// Salva as alterações da prova no Firebase
+  Future<void> _salvarAlteracoes(Map<String, dynamic> dados) async {
     setState(() {
       _isLoading = true;
     });
@@ -204,55 +249,39 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     try {
       final questoesMaps = dados['questoes'] as List<Map<String, dynamic>>;
 
-      // ETAPA 1: Criar a "casca" da prova
-      final String exameId = await _examService.createExam(
-        title: dados['titulo'],
-        instructions: dados['instrucoes'],
-        subjectId: _disciplinaSelecionada, // 'subjectId' é o ID da Disciplina
-      );
-
-      // ETAPA 2: Salvar o ID do curso E CONTEÚDOS na prova (como pedido)
-      await _examService.updateExam(exameId, {
+      // ETAPA 1: Criar o mapa de dados para atualização
+      final Map<String, dynamic> updateData = {
+        'title': dados['titulo'],
+        'instructions': dados['instrucoes'],
+        'subjectId': _disciplinaSelecionada,
         'courseId': _cursoSelecionado,
         'contentIds': _conteudosSelecionados,
-      });
-      // ETAPA 3: Adicionar as questões à prova, uma por uma
-      bool allQuestionsAdded = true;
+      };
+
+      // ETAPA 2: Processar a nova lista de questões
+      final Map<String, dynamic> novasQuestoesMap = {};
       for (int i = 0; i < questoesMaps.length; i++) {
         final questaoMap = questoesMaps[i];
         final String questionId = questaoMap['id'];
         final int order = i + 1;
-        final double peso =
-            questaoMap['peso'] ?? 0.0; // Pega o peso do map
+        final double peso = questaoMap['peso'] ?? 0.0;
 
-        // Chama o service com o 'peso'
-        try {
-          await _examService.addQuestionToExam(
-            examId: exameId,
-            questionId: questionId,
-            number: order,
-            peso: peso,
-            suggestedLines: null,
-          );
-        } catch (e) {
-          allQuestionsAdded = false;
-          // Log do erro, mas continua tentando adicionar as outras questões
-          print('Erro ao adicionar questão $questionId: $e');
-        }
+        novasQuestoesMap[questionId] = {
+          'number': order,
+          'peso': peso,
+          'suggestedLines': null, // (ou pegar de questaoMap se existir)
+        };
       }
 
-      if (allQuestionsAdded) {
-        MessageUtils.mostrarSucesso(
-          context,
-          'Prova criada com sucesso com ${questoesMaps.length} questões!',
-        );
-      } else {
-        MessageUtils.mostrarErro(
-          context,
-          'Prova criada, mas algumas questões falharam ao ser adicionadas.',
-        );
-      }
+      updateData['questions'] = novasQuestoesMap;
 
+      // ETAPA 3: Chamar o serviço de atualização
+      await _examService.updateExam(widget.prova.id!, updateData);
+
+      // Se a disciplina mudou, atualiza o ID original para a próxima edição
+      _disciplinaOriginalId = _disciplinaSelecionada!;
+
+      // Retorna 'true' para a tela anterior (ProvasGeradasScreen)
       Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -267,10 +296,11 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     }
   }
 
+  // Construtor de Container (copiado de criar_prova_screen)
   Widget _buildContainer({required Widget child, double? height}) {
     return Container(
       width: double.infinity,
-      height: height, // Altura automática (nula) permite o ExpansionTile crescer
+      height: height,
       decoration: BoxDecoration(
         color: _whiteColor,
         borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
@@ -355,11 +385,13 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
               ],
             ),
           ),
+
           // Conteúdo principal
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: _primaryColor))
+                    child: CircularProgressIndicator(color: _primaryColor),
+                  )
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(AppConstants.defaultPadding),
                     child: Column(
@@ -367,7 +399,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                       children: [
                         const Center(
                           child: Text(
-                            'Criar Nova Prova',
+                            'Editar Prova', // *** TÍTULO ALTERADO ***
                             style: TextStyle(
                               color: _textColor,
                               fontFamily: 'Inter-Bold',
@@ -392,7 +424,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         _buildContainer(
                           height: 50,
                           child: TextField(
-                            controller: _tituloController,
+                            controller: _tituloController, // Pré-preenchido
                             decoration: const InputDecoration(
                               hintText: 'Digite o título da prova',
                               hintStyle: TextStyle(
@@ -402,7 +434,9 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                               ),
                               border: InputBorder.none,
                               contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 14),
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
                             ),
                           ),
                         ),
@@ -422,7 +456,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         _buildContainer(
                           height: 100,
                           child: TextField(
-                            controller: _instrucoesController,
+                            controller: _instrucoesController, // Pré-preenchido
                             maxLines: 4,
                             decoration: const InputDecoration(
                               hintText: 'Digite as instruções da prova',
@@ -455,9 +489,10 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         _buildContainer(
                           height: 50, // Altura fixa para dropdown
                           child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String?>( // Tipo anulável
+                            child: DropdownButton<String?>(
+                              // Tipo anulável
                               isExpanded: true,
-                              value: _cursoSelecionado,
+                              value: _cursoSelecionado, // Pré-preenchido
                               hint: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16),
                                 child: Text(
@@ -470,7 +505,8 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                 ),
                               ),
                               items: _cursos.map((Course curso) {
-                                return DropdownMenuItem<String?>( // Tipo anulável
+                                return DropdownMenuItem<String?>(
+                                  // Tipo anulável
                                   value: curso.id,
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
@@ -504,9 +540,10 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         _buildContainer(
                           height: 50, // Altura fixa para dropdown
                           child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String?>( // Tipo anulável
+                            child: DropdownButton<String?>(
+                              // Tipo anulável
                               isExpanded: true,
-                              value: _disciplinaSelecionada,
+                              value: _disciplinaSelecionada, // Pré-preenchido
                               hint: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16),
                                 child: Text(
@@ -519,7 +556,8 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                 ),
                               ),
                               items: _disciplinas.map((Discipline disciplina) {
-                                return DropdownMenuItem<String?>( // Tipo anulável
+                                return DropdownMenuItem<String?>(
+                                  // Tipo anulável
                                   value: disciplina.id,
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
@@ -530,7 +568,11 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                                 );
                               }).toList(),
                               onChanged: (String? newValue) {
-                                _atualizarConteudos(newValue);
+                                // Atualiza os conteúdos (sem manter a seleção, pois a disciplina mudou)
+                                _atualizarConteudos(
+                                  newValue,
+                                  manterSelecao: false,
+                                );
                               },
                             ),
                           ),
@@ -550,50 +592,58 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         const SizedBox(height: 16),
                         _buildContainer(
                           // A altura agora é nula (automática) para o ExpansionTile
-                          height: null, 
+                          height: null,
                           child: ExpansionTile(
                             title: Text(
                               _conteudosSelecionados.isEmpty
                                   ? (_disciplinaSelecionada == null
-                                      ? 'Selecione uma disciplina primeiro'
-                                      : 'Selecione os conteúdos (opcional)')
+                                        ? 'Selecione uma disciplina primeiro'
+                                        : 'Selecione os conteúdos (opcional)')
                                   : '${_conteudosSelecionados.length} conteúdo(s) selecionado(s)',
                               style: TextStyle(
-                                color: _conteudosSelecionados.isEmpty && _disciplinaSelecionada != null
+                                color:
+                                    _conteudosSelecionados.isEmpty &&
+                                        _disciplinaSelecionada != null
                                     ? Colors.black54
-                                    : (_disciplinaSelecionada == null ? Colors.grey : _textColor),
+                                    : (_disciplinaSelecionada == null
+                                          ? Colors.grey
+                                          : _textColor),
                                 fontSize: 16,
                                 fontWeight: _conteudosSelecionados.isEmpty
                                     ? FontWeight.w300
                                     : FontWeight.normal,
                               ),
                             ),
-                            
-                            // *** INÍCIO DA CORREÇÃO ***
-                            children: _disciplinaSelecionada == null
-                                ? [] // Não mostra nada se a disciplina não estiver selecionada
-                                : _conteudosFiltrados
-                                    .where((c) => c.id != null) // 1. Filtra IDs nulos
-                                    .map((Content conteudo) {
-                                      // 2. Agora temos certeza que conteudo.id não é nulo
-                                      final String contentId = conteudo.id!; 
 
-                                      return CheckboxListTile(
-                                        title: Text(conteudo.description),
-                                        // 3. Usa a variável não-anulável 'contentId'
-                                        value: _conteudosSelecionados.contains(contentId),
-                                        onChanged: (bool? value) {
-                                          setState(() {
-                                            if (value == true) {
-                                              _conteudosSelecionados.add(contentId);
-                                            } else {
-                                              _conteudosSelecionados.remove(contentId);
-                                            }
-                                          });
-                                        },
-                                      );
-                                    }).toList(),
-                            // *** FIM DA CORREÇÃO ***
+                            children: _disciplinaSelecionada == null
+                                ? []
+                                : _conteudosFiltrados
+                                      .where((c) => c.id != null)
+                                      .map((Content conteudo) {
+                                        final String contentId = conteudo.id!;
+
+                                        return CheckboxListTile(
+                                          title: Text(conteudo.description),
+                                          value: _conteudosSelecionados
+                                              .contains(
+                                                contentId,
+                                              ), // Pré-preenchido
+                                          onChanged: (bool? value) {
+                                            setState(() {
+                                              if (value == true) {
+                                                _conteudosSelecionados.add(
+                                                  contentId,
+                                                );
+                                              } else {
+                                                _conteudosSelecionados.remove(
+                                                  contentId,
+                                                );
+                                              }
+                                            });
+                                          },
+                                        );
+                                      })
+                                      .toList(),
                           ),
                         ),
                         const SizedBox(height: 32),
@@ -601,8 +651,9 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         // Botão de Ação
                         Center(
                           child: ElevatedButton(
-                            onPressed:
-                                _isLoading ? null : _selecionarQuestoes,
+                            onPressed: _isLoading
+                                ? null
+                                : _editarQuestoes, // Chama _editarQuestoes
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _primaryColor,
                               foregroundColor: _whiteColor,
@@ -616,7 +667,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                               elevation: 4,
                             ),
                             child: const Text(
-                              'Selecionar Questões',
+                              'Editar Questões Selecionadas', // *** TEXTO ALTERADO ***
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

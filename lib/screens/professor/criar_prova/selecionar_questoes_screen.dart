@@ -1,24 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart'; // NECESSÁRIO PARA CARREGAR CONTEÚDOS
 import '/models/question_model.dart';
-import '/models/option_model.dart'; 
-import '/models/enums.dart'; 
+import '/models/option_model.dart';
+import '/models/enums.dart';
+import '/models/content_model.dart'; 
 import '/services/question_service.dart';
+import '/services/content_service.dart'; 
 import '/utils/message_utils.dart';
 import '/core/app_colors.dart';
 import '/core/app_constants.dart';
+import '/models/exam_question_link_model.dart'; 
 
 class SelecionarQuestoesScreen extends StatefulWidget {
   final String subjectId;
-  final String? contentId;
+  
+  // Recebe uma LISTA de IDs de conteúdo, que pode ser nula
+  final List<String>? contentIds;
+  
   final String tituloProva;
   final String instrucoesProva;
+
+  /// Lista de questões já vinculadas à prova (para edição)
+  final List<ExamQuestionLink>? questoesIniciais;
 
   const SelecionarQuestoesScreen({
     super.key,
     required this.subjectId,
-    this.contentId,
+    this.contentIds,
     required this.tituloProva,
     required this.instrucoesProva,
+    this.questoesIniciais, 
   });
 
   @override
@@ -35,6 +46,7 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
 
   // Serviços
   final QuestionService _questionService = QuestionService();
+  final ContentService _contentService = ContentService(); // NOVO SERVIÇO
 
   // Listas de Questões
   List<Question> _questoes = []; // Lista principal (master)
@@ -47,6 +59,12 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
   // Controladores e estado para filtros
   final TextEditingController _filtroTextoController = TextEditingController();
   QuestionDifficulty? _filtroDificuldade;
+  
+  // --- NOVOS ESTADOS PARA O FILTRO DE CONTEÚDO ---
+  String? _filtroConteudo; // Guarda o ID do conteúdo selecionado no filtro
+  List<Content> _conteudosParaFiltro = []; // Lista de conteúdos para popular o dropdown
+  // --- FIM DOS NOVOS ESTADOS ---
+
 
   // Armazena os controllers de peso
   final Map<String, TextEditingController> _pesoControllers = {};
@@ -72,20 +90,58 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
     super.dispose();
   }
 
-  /// Carrega as questões do Firebase
+  /// Carrega as questões E os conteúdos do Firebase
   Future<void> _carregarQuestoes() async {
     setState(() => _isLoading = true);
     try {
-      final Stream<List<Question>> stream;
+      // 1. Carregar Questões (lógica existente)
+      final stream = _questionService.getQuestionsBySubjectStream(widget.subjectId);
+      final List<Question> questoesDaDisciplina = await stream.first;
 
-      if (widget.contentId != null) {
-        stream = _questionService.getQuestionsByContentStream(widget.contentId!);
-      } else {
-        stream = _questionService.getQuestionsBySubjectStream(widget.subjectId);
+      // 2. Carregar TODOS os Conteúdos (para pegar as descrições)
+      final contentStream = _contentService.getContentStream();
+      final DatabaseEvent contentEvent = await contentStream.first;
+      
+      final List<Content> todosConteudosList = [];
+      if (contentEvent.snapshot.exists && contentEvent.snapshot.value != null) {
+          final data = contentEvent.snapshot.value;
+          if (data is Map) {
+              for (final childSnapshot in contentEvent.snapshot.children) {
+                  try {
+                      todosConteudosList.add(Content.fromSnapshot(childSnapshot));
+                  } catch (e) {
+                      print('Erro ao processar conteúdo: $e'); // Log de erro
+                  }
+              }
+          }
       }
 
-      final List<Question> tempQuestoes = await stream.first;
+      // 3. Filtrar Questões (Master List)
+      final List<Question> tempQuestoes;
+      final Set<String> contentIdSet = (widget.contentIds != null && widget.contentIds!.isNotEmpty)
+          ? widget.contentIds!.toSet()
+          : {};
 
+      if (contentIdSet.isNotEmpty) {
+        // Filtra pelas IDs de conteúdo selecionadas na tela anterior
+        tempQuestoes = questoesDaDisciplina
+            .where((q) => contentIdSet.contains(q.contentId))
+            .toList();
+      } else {
+        // Se nenhuma ID de conteúdo foi passada, usa todas as questões da disciplina
+        tempQuestoes = questoesDaDisciplina;
+      }
+      
+      // 4. Filtrar Conteúdos (Para popular o Dropdown de Filtro)
+      // Pega o conjunto de IDs de conteúdo que estão *realmente* presentes nas questões carregadas.
+      final Set<String> idsDeConteudosDasQuestoes = tempQuestoes.map((q) => q.contentId).toSet();
+      
+      final List<Content> tempConteudosParaFiltro = todosConteudosList
+          .where((c) => c.id != null && idsDeConteudosDasQuestoes.contains(c.id!))
+          .toList();
+
+
+      // 5. Inicializar Controladores de Peso (lógica existente)
       for (var controller in _pesoControllers.values) {
         controller.dispose();
       }
@@ -93,7 +149,6 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
 
       for (var questao in tempQuestoes) {
         if (questao.id != null) {
-          // Inicializa o controller com peso 1.0
           _pesoControllers[questao.id!] = TextEditingController(text: '1.0');
         }
       }
@@ -101,8 +156,11 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
       if (mounted) {
         setState(() {
           _questoes = tempQuestoes;
+          _conteudosParaFiltro = tempConteudosParaFiltro; // Salva os conteúdos para o filtro
           _filtrarQuestoes();
           _isLoading = false;
+
+          _preencherQuestoesIniciais();
         });
       }
     } catch (e) {
@@ -111,6 +169,40 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
         MessageUtils.mostrarErroFormatado(context, e);
       }
     }
+  }
+
+  /// Pré-preenche as questões selecionadas e pesos (modo de edição)
+  void _preencherQuestoesIniciais() {
+    if (widget.questoesIniciais == null || widget.questoesIniciais!.isEmpty) {
+      return;
+    }
+
+    // Pega os IDs das questões que foram carregadas nesta tela
+    final Set<String> idsQuestoesCarregadas = _questoes.map((q) => q.id!).toSet();
+
+    for (final link in widget.questoesIniciais!) {
+      // Verifica se a questão inicial ainda existe e pertence a esta disciplina/conteúdo
+      if (idsQuestoesCarregadas.contains(link.questionId)) {
+        
+        // Adiciona ao mapa de selecionadas
+        _questoesSelecionadas[link.questionId] = {
+          'id': link.questionId,
+          'peso': link.weight,
+          // Busca a questão completa na lista carregada
+          'questao': _questoes.firstWhere((q) => q.id == link.questionId).toJson(),
+        };
+
+        // Atualiza o controlador de peso correspondente
+        if (_pesoControllers.containsKey(link.questionId)) {
+          _pesoControllers[link.questionId]!.text = link.weight.toString();
+        }
+      }
+    }
+
+    // Recalcula o peso total e atualiza a UI
+    setState(() {
+      _calcularPesoTotal();
+    });
   }
 
   /// Calcula peso total
@@ -124,17 +216,26 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
     });
   }
 
-  /// Lógica de filtragem
+  /// Lógica de filtragem (AGORA COM FILTRO DE CONTEÚDO)
   void _filtrarQuestoes() {
     List<Question> filtradas = List.from(_questoes);
     final String texto = _filtroTextoController.text.toLowerCase().trim();
 
+    // 1. Filtro por Texto
     if (texto.isNotEmpty) {
       filtradas = filtradas
           .where((q) => q.questionText.toLowerCase().contains(texto))
           .toList();
     }
 
+    // 2. NOVO FILTRO DE CONTEÚDO
+    if (_filtroConteudo != null) {
+      filtradas = filtradas
+          .where((q) => q.contentId == _filtroConteudo)
+          .toList();
+    }
+
+    // 3. Filtro por Dificuldade
     if (_filtroDificuldade != null) {
       filtradas = filtradas
           .where((q) => q.difficulty == _filtroDificuldade)
@@ -245,7 +346,7 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
           'questao': questao.toJson(),
         };
       }
-      _calcularPesoTotal(); 
+      _calcularPesoTotal();
     });
   }
 
@@ -255,7 +356,7 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
     if (peso != null && _questoesSelecionadas.containsKey(questaoId)) {
       setState(() {
         _questoesSelecionadas[questaoId]!['peso'] = peso;
-        _calcularPesoTotal(); 
+        _calcularPesoTotal();
       });
     }
   }
@@ -399,13 +500,14 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
     );
   }
 
-  /// Constrói o widget de Filtros
+  /// Constrói o widget de Filtros (COM O NOVO DROPDOWN)
   Widget _buildFiltros() {
     return Container(
       padding: const EdgeInsets.all(0), 
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. Filtro de Texto (Existente)
           TextField(
             controller: _filtroTextoController,
             decoration: InputDecoration(
@@ -429,6 +531,67 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
             ),
           ),
           const SizedBox(height: 12),
+
+          // 2. NOVO FILTRO DE CONTEÚDO
+          // Só mostra o filtro se houver mais de 1 conteúdo para filtrar
+          if (_conteudosParaFiltro.length > 1) ...[
+            Container(
+              height: 50,
+              decoration: BoxDecoration(
+                color: _backgroundColor,
+                borderRadius:
+                    BorderRadius.circular(AppConstants.defaultBorderRadius),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonHideUnderline(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: DropdownButton<String?>( // Tipo anulável
+                          isExpanded: true,
+                          value: _filtroConteudo,
+                          hint: const Text('Filtrar por conteúdo',
+                              style: TextStyle(color: Colors.black54)),
+                          icon: const Icon(Icons.menu_book, // Ícone de "livro"
+                              color: _primaryColor,
+                              size: 20),
+                          items: _conteudosParaFiltro.map((conteudo) {
+                            return DropdownMenuItem<String?>(
+                              value: conteudo.id,
+                              child: Text(conteudo.description,
+                                  overflow: TextOverflow.ellipsis),
+                            );
+                          }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _filtroConteudo = newValue;
+                              _filtrarQuestoes();
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_filtroConteudo != null)
+                    IconButton(
+                      icon:
+                          const Icon(Icons.clear, color: Colors.grey, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _filtroConteudo = null;
+                          _filtrarQuestoes();
+                        });
+                      },
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          // --- FIM DO NOVO FILTRO ---
+
+          // 3. Filtro de Dificuldade (Existente)
           Container(
             height: 50,
             decoration: BoxDecoration(

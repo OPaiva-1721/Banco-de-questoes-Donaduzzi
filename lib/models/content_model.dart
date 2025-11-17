@@ -1,10 +1,9 @@
 import 'package:firebase_database/firebase_database.dart';
 
-/// Modelo para `Content` (Conteúdo de uma Disciplina)
 class Content {
   final String? id;
   final String description;
-  final String subjectId; // Foreign Key para Discipline/Subject
+  final String subjectId; 
 
   Content({this.id, required this.description, required this.subjectId});
 
@@ -24,8 +23,8 @@ class Content {
     final data = _dataToMap(snapshot);
     return Content(
       id: snapshot.key,
-      description: data['description'] ?? '',
-      subjectId: data['subjectId'] ?? '',
+      description: data['description']?.toString() ?? '',
+      subjectId: data['subjectId']?.toString() ?? '',
     );
   }
 }
