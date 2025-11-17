@@ -3,12 +3,13 @@ import 'package:firebase_database/firebase_database.dart'; // NECESSÁRIO PARA C
 import '/models/question_model.dart';
 import '/models/option_model.dart';
 import '/models/enums.dart';
-import '/models/content_model.dart'; // NOVO IMPORT
+import '/models/content_model.dart'; 
 import '/services/question_service.dart';
-import '/services/content_service.dart'; // NOVO IMPORT
+import '/services/content_service.dart'; 
 import '/utils/message_utils.dart';
 import '/core/app_colors.dart';
 import '/core/app_constants.dart';
+import '/models/exam_question_link_model.dart'; 
 
 class SelecionarQuestoesScreen extends StatefulWidget {
   final String subjectId;
@@ -19,12 +20,16 @@ class SelecionarQuestoesScreen extends StatefulWidget {
   final String tituloProva;
   final String instrucoesProva;
 
+  /// Lista de questões já vinculadas à prova (para edição)
+  final List<ExamQuestionLink>? questoesIniciais;
+
   const SelecionarQuestoesScreen({
     super.key,
     required this.subjectId,
     this.contentIds,
     required this.tituloProva,
     required this.instrucoesProva,
+    this.questoesIniciais, 
   });
 
   @override
@@ -154,6 +159,8 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
           _conteudosParaFiltro = tempConteudosParaFiltro; // Salva os conteúdos para o filtro
           _filtrarQuestoes();
           _isLoading = false;
+
+          _preencherQuestoesIniciais();
         });
       }
     } catch (e) {
@@ -162,6 +169,40 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
         MessageUtils.mostrarErroFormatado(context, e);
       }
     }
+  }
+
+  /// Pré-preenche as questões selecionadas e pesos (modo de edição)
+  void _preencherQuestoesIniciais() {
+    if (widget.questoesIniciais == null || widget.questoesIniciais!.isEmpty) {
+      return;
+    }
+
+    // Pega os IDs das questões que foram carregadas nesta tela
+    final Set<String> idsQuestoesCarregadas = _questoes.map((q) => q.id!).toSet();
+
+    for (final link in widget.questoesIniciais!) {
+      // Verifica se a questão inicial ainda existe e pertence a esta disciplina/conteúdo
+      if (idsQuestoesCarregadas.contains(link.questionId)) {
+        
+        // Adiciona ao mapa de selecionadas
+        _questoesSelecionadas[link.questionId] = {
+          'id': link.questionId,
+          'peso': link.weight,
+          // Busca a questão completa na lista carregada
+          'questao': _questoes.firstWhere((q) => q.id == link.questionId).toJson(),
+        };
+
+        // Atualiza o controlador de peso correspondente
+        if (_pesoControllers.containsKey(link.questionId)) {
+          _pesoControllers[link.questionId]!.text = link.weight.toString();
+        }
+      }
+    }
+
+    // Recalcula o peso total e atualiza a UI
+    setState(() {
+      _calcularPesoTotal();
+    });
   }
 
   /// Calcula peso total
