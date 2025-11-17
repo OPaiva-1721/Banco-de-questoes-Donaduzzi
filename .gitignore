@@ -171,3 +171,9 @@ node_modules/
 # Temporary folders
 tmp/
 temp/
+
+# Keystore files (NUNCA commitar!)
+*.jks
+*.keystore
+android/key.properties
+android/app/*.jks

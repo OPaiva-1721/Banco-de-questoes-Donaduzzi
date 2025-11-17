@@ -5,7 +5,6 @@ import 'error_messages.dart';
 import 'auth_error_utils.dart';
 
 class MessageUtils {
-  // Mostrar mensagem de sucesso ou erro
   static void mostrarMensagem(
     BuildContext context,
     String mensagem, {
@@ -42,7 +41,6 @@ class MessageUtils {
     );
   }
 
-  // Mostrar mensagem de sucesso
   static void mostrarSucesso(
     BuildContext context,
     String mensagem, {
@@ -57,7 +55,6 @@ class MessageUtils {
     );
   }
 
-  // Mostrar mensagem de erro (versão simples com string)
   static void mostrarErro(
     BuildContext context,
     String mensagem, {
@@ -94,7 +91,6 @@ class MessageUtils {
       mensagem = ErrorMessages.fromException(error);
     }
 
-    // Determinar ícone baseado no tipo de erro
     IconData? icon = Icons.error_outline;
     if (error is NetworkException) {
       icon = Icons.wifi_off;
@@ -109,7 +105,6 @@ class MessageUtils {
     } else if (error is AuthenticationException) {
       icon = Icons.person_off_outlined;
     } else if (error is FirebaseAuthException) {
-      // Ícone específico para erros de autenticação do Firebase
       if (AuthErrorUtils.isNetworkError(error)) {
         icon = Icons.wifi_off;
       } else if (AuthErrorUtils.isCredentialError(error)) {
@@ -157,7 +152,6 @@ class MessageUtils {
     );
   }
 
-  // Mostrar toast no canto inferior direito (conforme preferência do usuário)
   static void mostrarToast(BuildContext context, String mensagem) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

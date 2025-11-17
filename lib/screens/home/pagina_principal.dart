@@ -14,7 +14,6 @@ class TelaInicio extends StatelessWidget {
 
   static final FirebaseService _firebaseService = FirebaseService();
 
-  // Sistema de temas
   static const Color _primaryColor = Color(0xFF541822);
   static const Color _backgroundColor = Color(0xFFF5F5F5);
   static const Color _textColor = Color(0xFF333333);
@@ -30,10 +29,8 @@ class TelaInicio extends StatelessWidget {
       backgroundColor: _backgroundColor,
       body: Column(
         children: [
-          // Header fixo
           _buildHeader(context, isMobile, isTablet),
 
-          // Conteúdo principal
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
@@ -42,12 +39,10 @@ class TelaInicio extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // Título
                   _buildTitle(isMobile, isTablet),
 
                   const SizedBox(height: 32),
 
-                  // Cards de funcionalidades
                   _buildCardsGrid(context, isMobile, isTablet),
                 ],
               ),
@@ -58,7 +53,6 @@ class TelaInicio extends StatelessWidget {
     );
   }
 
-  // Header responsivo
   Widget _buildHeader(BuildContext context, bool isMobile, bool isTablet) {
     final headerHeight = isMobile ? 100.0 : (isTablet ? 110.0 : 120.0);
     final logoSize = isMobile ? 140.0 : (isTablet ? 150.0 : 160.0);
@@ -80,7 +74,6 @@ class TelaInicio extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // Logo centralizado
           Center(
             child: Image.asset(
               'assets/images/logo.png',
@@ -109,7 +102,6 @@ class TelaInicio extends StatelessWidget {
               },
             ),
           ),
-          // Botão de logout no canto direito
           Positioned(
             right: 16,
             top: 0,
@@ -131,7 +123,6 @@ class TelaInicio extends StatelessWidget {
     );
   }
 
-  // Título da página
   Widget _buildTitle(bool isMobile, bool isTablet) {
     return Text(
       "Painel do Professor",
@@ -144,7 +135,6 @@ class TelaInicio extends StatelessWidget {
     );
   }
 
-  // Grid de cards responsivo
   Widget _buildCardsGrid(BuildContext context, bool isMobile, bool isTablet) {
     final cards = [
       _CardData(
@@ -197,7 +187,6 @@ class TelaInicio extends StatelessWidget {
     );
   }
 
-  // Card individual otimizado
   Widget _buildCard(
     BuildContext context,
     _CardData cardData,
@@ -331,7 +320,6 @@ class TelaInicio extends StatelessWidget {
     );
   }
 
-  // Método para fazer logout
   Future<void> _fazerLogout(BuildContext context) async {
     try {
       await _firebaseService.signOut();
@@ -346,7 +334,6 @@ class TelaInicio extends StatelessWidget {
   }
 }
 
-// Classe para dados dos cards
 class _CardData {
   final String title;
   final String subtitle;

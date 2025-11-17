@@ -11,19 +11,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // --- INÍCIO DA CORREÇÃO ---
-    // Verifica se já existe uma instância default do Firebase
     if (Firebase.apps.isEmpty) {
-      // Se não houver, inicializa uma nova
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
       print('Firebase inicializado com sucesso');
     } else {
-      // Se já existir, apenas informa
       print('Firebase já inicializado');
     }
-    // --- FIM DA CORREÇÃO ---
   } catch (e) {
     print('Erro ao inicializar Firebase: $e');
   }
@@ -58,7 +53,6 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // 1. Estado de Carregamento
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(
@@ -74,7 +68,6 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // 2. Estado de Erro
         if (snapshot.hasError) {
           print(
             'AuthWrapper - Erro no stream de autenticação: ${snapshot.error}',
@@ -93,14 +86,11 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // 3. Estado Logado
         if (snapshot.hasData && snapshot.data != null) {
           final user = snapshot.data!;
           print('AuthWrapper - Usuário logado: ${user.email} (${user.uid})');
           return const TelaInicio();
-        }
-        // 4. Estado Deslogado
-        else {
+        } else {
           print('AuthWrapper - Usuário não logado, mostrando TelaLogin');
           return const TelaLogin();
         }
