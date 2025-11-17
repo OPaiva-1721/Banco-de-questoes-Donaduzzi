@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'dart:async'; // Necessário para o Future.wait
+import 'dart:async';
 
-// --- CORREÇÃO: Imports de Raiz ou Pacote ---
 import 'package:prova/services/exam_service.dart';
-import 'package:prova/services/pdf_service.dart'; //
+import 'package:prova/services/pdf_service.dart';
 import 'package:prova/models/exam_model.dart';
-import 'package:prova/utils/message_utils.dart'; //
+import 'package:prova/utils/message_utils.dart';
 import 'package:prova/core/app_colors.dart';
 import 'package:prova/core/exceptions/app_exceptions.dart';
-
 import 'package:prova/services/course_service.dart';
 import 'package:prova/models/course_model.dart';
 import 'package:prova/services/subject_service.dart';
 import 'package:prova/models/discipline_model.dart';
-// ---------------------------
 
 class ProvasGeradasScreen extends StatefulWidget {
   const ProvasGeradasScreen({super.key});
@@ -24,26 +21,19 @@ class ProvasGeradasScreen extends StatefulWidget {
 }
 
 class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
-  // Constantes de cores
   static const Color _primaryColor = AppColors.primary;
   static const Color _backgroundColor = AppColors.background;
   static const Color _textColor = AppColors.text;
   static const Color _whiteColor = AppColors.white;
 
-  // Serviços
   final ExamService _examService = ExamService();
-  
-  // --- ESTADO SIMPLIFICADO ---
   final CourseService _courseService = CourseService();
   final SubjectService _subjectService = SubjectService();
 
   bool _isLoading = true;
   List<Exam> _provas = [];
-  
-  // Mapas para consulta de nomes (para o PDF)
   Map<String, Course> _cursosMap = {};
   Map<String, Discipline> _disciplinasMap = {};
-  // ---------------------------
 
   @override
   void initState() {
@@ -51,7 +41,6 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     _carregarDados(); 
   }
 
-  // Helper para processar dados do Firebase
   List<T> _processarSnapshot<T>(
       DataSnapshot snapshot, T Function(DataSnapshot) fromSnapshot) {
     final list = <T>[];
@@ -66,24 +55,20 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     return list;
   }
 
-  // --- FUNÇÃO DE CARREGAMENTO SIMPLIFICADA ---
   Future<void> _carregarDados() async {
     if (mounted) setState(() => _isLoading = true);
     
     try {
-      // 1. Pega todos os streams necessários
       final examsStream = _examService.getExamsStream();
       final coursesStream = _courseService.getCoursesStream();
       final subjectsStream = _subjectService.getSubjectsStream();
 
-      // 2. Espera por todos os dados
       final results = await Future.wait([
         examsStream.first,
         coursesStream.first,
         subjectsStream.first,
       ]);
 
-      // 3. Processa os snapshots
       final DatabaseEvent examsEvent = results[0];
       final DatabaseEvent coursesEvent = results[1];
       final DatabaseEvent subjectsEvent = results[2];
@@ -97,7 +82,6 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
       final List<Discipline> tempSubjects =
           _processarSnapshot(subjectsEvent.snapshot, Discipline.fromSnapshot);
 
-      // 4. Cria os mapas de consulta (para PDF)
       final Map<String, Course> tempCursosMap = {
         for (var curso in tempCourses) curso.id!: curso
       };
@@ -106,7 +90,6 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
         for (var disciplina in tempSubjects) disciplina.id!: disciplina
       };
 
-      // 5. Ordena as provas
       tempProvas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       if (mounted) {
@@ -211,7 +194,6 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // --- NOME DO AUTOR ---
                   Text(
                     'Criado por: $nomeAutor',
                     style: TextStyle(
@@ -221,8 +203,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
-                  // --- OUTRAS INFORMAÇÕES ---
+
                   Text(
                     'Curso: $nomeCurso',
                     style: const TextStyle(fontSize: 14, color: _textColor),
@@ -233,8 +214,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                     style: const TextStyle(fontSize: 14, color: _textColor),
                   ),
                   const SizedBox(height: 4),
-                  // ------------------------------------
-                  
+
                   Text(
                     'Questões: ${prova.questions.length}',
                     style: const TextStyle(fontSize: 14, color: _textColor),
@@ -263,14 +243,11 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
   }
 
   @override
-  // --- CORREÇÃO DO ERRO DE DIGITAÇÃO 'BuildContextC' ---
   Widget build(BuildContext context) {
-  // -------------------------------------------------
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: Column(
         children: [
-          // Header
           Container(
             width: double.infinity,
             height: 100,

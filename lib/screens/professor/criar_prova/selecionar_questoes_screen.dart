@@ -679,7 +679,6 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
         label: const Text('Concluir Seleção'),
         icon: const Icon(Icons.check),
         backgroundColor: _primaryColor,
-        // *** CORREÇÃO APLICADA AQUI ***
         foregroundColor: _whiteColor, 
       ),
     );
