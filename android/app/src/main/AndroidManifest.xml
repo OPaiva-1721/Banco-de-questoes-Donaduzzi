@@ -1,10 +1,42 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Permissões necessárias para o Firebase -->
+    <!-- 
+        PERMISSÕES DO SISTEMA DE PROVAS
+        Todas as permissões foram mapeadas e justificadas conforme MPC.md e permissions.yaml
+        Escopo mínimo: apenas permissões essenciais para funcionalidades principais
+    -->
+    
+    <!-- Permissão de instalação (normal): Comunicação com Firebase -->
     <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- Permissão de instalação (normal): Verificação de conectividade -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
+    <!-- Permissão de instalação (normal): Manter tela ativa durante provas -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Permissão de execução (dangerous): Notificações push (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- Permissão de execução (dangerous): Acesso a imagens da galeria (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    
+    <!-- Permissão de execução (dangerous): Acesso a imagens (Android < 13) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
+    
+    <!-- Permissão de execução (dangerous): Acesso à câmera para captura de fotos -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- 
+        NOTA: WRITE_EXTERNAL_STORAGE não é necessária porque:
+        - Android 10+: O plugin printing usa Scoped Storage (não requer permissão dangerous)
+        - Android < 10: O plugin printing gerencia a permissão automaticamente via plugin
+        - Alternativa: Compartilhamento direto via Intent sem salvar no dispositivo
+        Ver documentação em /docs/MPC.md e /docs/permissions.yaml
+    -->
+    
     <application
-        android:label="prova"
+        android:label="Sistema de Provas"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

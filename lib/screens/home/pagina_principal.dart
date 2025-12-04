@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:prova/screens/professor/banco_questoes/banco_questoes_menu_screen.dart';
+import 'package:prova/screens/professor/conteudo/gerenciar_conteudos_screen.dart';
 import '../../utils/message_utils.dart';
-import '../../utils/firebase_data_populator.dart';
 import '../../services/firebase_service.dart';
 import '../../services/permission_service.dart';
 import '../auth/tela_login.dart';
 import '../professor/criar_prova/criar_prova_screen.dart';
-import '../professor/banco_questoes/banco_questoes_menu_screen.dart';
 import '../professor/provas_geradas_screen.dart';
 import '../professor/disciplinas/gerenciar_disciplinas_screen.dart';
 import '../professor/cursos/gerenciar_cursos_screen.dart';
+import '../professor/corrigir_prova/corrigir_prova_screen.dart';
 
 class TelaInicio extends StatefulWidget {
   const TelaInicio({super.key});
@@ -20,7 +21,6 @@ class TelaInicio extends StatefulWidget {
 class _TelaInicioState extends State<TelaInicio> {
   static final FirebaseService _firebaseService = FirebaseService();
 
-  // Sistema de temas
   static const Color _primaryColor = Color(0xFF541822);
   static const Color _backgroundColor = Color(0xFFF5F5F5);
   static const Color _textColor = Color(0xFF333333);
@@ -56,10 +56,8 @@ class _TelaInicioState extends State<TelaInicio> {
       backgroundColor: _backgroundColor,
       body: Column(
         children: [
-          // Header fixo
           _buildHeader(context, isMobile, isTablet),
 
-          // Conteúdo principal
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(
@@ -68,12 +66,10 @@ class _TelaInicioState extends State<TelaInicio> {
               ),
               child: Column(
                 children: [
-                  // Título
                   _buildTitle(isMobile, isTablet),
 
                   const SizedBox(height: 32),
 
-                  // Cards de funcionalidades
                   _buildCardsGrid(context, isMobile, isTablet),
                 ],
               ),
@@ -84,7 +80,6 @@ class _TelaInicioState extends State<TelaInicio> {
     );
   }
 
-  // Header responsivo
   Widget _buildHeader(BuildContext context, bool isMobile, bool isTablet) {
     final headerHeight = isMobile ? 100.0 : (isTablet ? 110.0 : 120.0);
     final logoSize = isMobile ? 140.0 : (isTablet ? 150.0 : 160.0);
@@ -106,7 +101,6 @@ class _TelaInicioState extends State<TelaInicio> {
       ),
       child: Stack(
         children: [
-          // Logo centralizado
           Center(
             child: Image.asset(
               'assets/images/logo.png',
@@ -135,7 +129,6 @@ class _TelaInicioState extends State<TelaInicio> {
               },
             ),
           ),
-          // Botão de logout no canto direito
           Positioned(
             right: 16,
             top: 0,
@@ -157,7 +150,6 @@ class _TelaInicioState extends State<TelaInicio> {
     );
   }
 
-  // Título da página
   Widget _buildTitle(bool isMobile, bool isTablet) {
     return Text(
       "Painel do Professor",
@@ -170,7 +162,6 @@ class _TelaInicioState extends State<TelaInicio> {
     );
   }
 
-  // Grid de cards responsivo
   Widget _buildCardsGrid(BuildContext context, bool isMobile, bool isTablet) {
     final cards = [
       _CardData(
@@ -192,22 +183,28 @@ class _TelaInicioState extends State<TelaInicio> {
         onTap: () => _navegarParaProvasGeradas(context),
       ),
       _CardData(
+        title: "Corrigir prova",
+        subtitle: "Corrija provas automaticamente usando a câmera.",
+        icon: Icons.camera_alt,
+        onTap: () => _navegarParaCorrigirProva(context),
+      ),
+      _CardData(
         title: "Gerenciar Disciplinas",
         subtitle: "Adicione, edite ou gerencie as disciplinas do sistema.",
         icon: Icons.school,
         onTap: () => _navegarParaDisciplinas(context),
       ),
       _CardData(
+        title: "Criar novo conteudo",
+        subtitle: "Crie um novo conteúdo selecionando questões do banco.",
+        icon: Icons.add,
+        onTap: () => _navegarParaCriarConteudo(context),
+      ),
+      _CardData(
         title: "Gerenciar Cursos",
         subtitle: "Adicione, edite ou gerencie os cursos do sistema.",
         icon: Icons.school_outlined,
         onTap: () => _navegarParaCursos(context),
-      ),
-      _CardData(
-        title: "Popular Dados",
-        subtitle: "Adicione dados de exemplo (cursos e disciplinas).",
-        icon: Icons.data_usage,
-        onTap: () => _popularDados(context),
       ),
     ];
 
@@ -223,7 +220,6 @@ class _TelaInicioState extends State<TelaInicio> {
     );
   }
 
-  // Card individual otimizado
   Widget _buildCard(
     BuildContext context,
     _CardData cardData,
@@ -322,7 +318,7 @@ class _TelaInicioState extends State<TelaInicio> {
   void _navegarParaBancoQuestoes(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const BancoQuestoesMenuScreen()),
+      MaterialPageRoute(builder: (context) => const GerenciarQuestoesScreen()),
     );
   }
 
@@ -330,6 +326,13 @@ class _TelaInicioState extends State<TelaInicio> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
+    );
+  }
+
+  void _navegarParaCorrigirProva(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CorrigirProvaScreen()),
     );
   }
 
@@ -342,6 +345,13 @@ class _TelaInicioState extends State<TelaInicio> {
     );
   }
 
+  void _navegarParaCriarConteudo(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const GerenciarConteudosScreen()),
+    );
+  }
+
   void _navegarParaCursos(BuildContext context) {
     Navigator.push(
       context,
@@ -349,90 +359,20 @@ class _TelaInicioState extends State<TelaInicio> {
     );
   }
 
-  void _popularDados(BuildContext context) async {
-    final confirmacao = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Popular Dados'),
-        content: const Text(
-          'Deseja adicionar dados de exemplo ao Firebase?\n\n'
-          'Isso irá adicionar:\n'
-          '• 5 cursos\n'
-          '• 30 disciplinas\n\n'
-          'Esta ação pode demorar alguns segundos.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Popular'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmacao == true) {
-      // Mostrar loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Populando dados...'),
-            ],
-          ),
-        ),
-      );
-
-      try {
-        await FirebaseDataPopulator.popularTodosDados();
-
-        // Fechar loading
-        Navigator.pop(context);
-
-        // Mostrar sucesso
-        MessageUtils.mostrarSucesso(
-          context,
-          'Dados populados com sucesso!\n\n'
-          'Adicionados:\n'
-          '• 5 cursos\n'
-          '• 30 disciplinas',
-        );
-      } catch (e) {
-        // Fechar loading
-        Navigator.pop(context);
-
-        // Mostrar erro
-        MessageUtils.mostrarErro(context, 'Erro ao popular dados: $e');
-      }
-    }
-  }
-
-  // Método para fazer logout
   Future<void> _fazerLogout(BuildContext context) async {
     try {
-      await _firebaseService.fazerLogout();
+      await _firebaseService.signOut();
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const TelaLogin()),
         (route) => false,
       );
     } catch (e) {
-      MessageUtils.mostrarErro(
-        context,
-        'Erro ao fazer logout: ${e.toString()}',
-      );
+      MessageUtils.mostrarErroFormatado(context, e);
     }
   }
 }
 
-// Classe para dados dos cards
 class _CardData {
   final String title;
   final String subtitle;

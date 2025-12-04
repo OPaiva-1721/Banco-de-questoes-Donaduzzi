@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
-import '../../../core/app_colors.dart';
-import '../../../core/app_constants.dart';
-import '../../../services/exam_service.dart';
-import '../../../services/discipline_service.dart';
-import '../../../services/course_service.dart';
-import '../../../utils/message_utils.dart';
+import '/services/exam_service.dart';
+import '/models/course_model.dart';
+import '/models/discipline_model.dart';
+import '/models/content_model.dart';
+import '/services/course_service.dart';
+import '/services/subject_service.dart';
+import '/services/content_service.dart';
+import '/utils/message_utils.dart';
+import '/core/app_colors.dart';
+import '/core/app_constants.dart';
 import 'selecionar_questoes_screen.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class CriarProvaScreen extends StatefulWidget {
   const CriarProvaScreen({super.key});
@@ -24,84 +28,116 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
 
   // Serviços
   final ExamService _examService = ExamService();
-  final DisciplineService _disciplineService = DisciplineService();
   final CourseService _courseService = CourseService();
+  final SubjectService _subjectService = SubjectService();
+  final ContentService _contentService = ContentService();
 
-  // Estados dos dropdowns
-  String? _cursoSelecionado;
-  String? _disciplinaSelecionada;
+  // Controladores
   final TextEditingController _tituloController = TextEditingController();
   final TextEditingController _instrucoesController = TextEditingController();
 
-  // Estados
-  bool _isLoading = false;
-  List<Map<String, dynamic>> _cursos = [];
-  List<Map<String, dynamic>> _disciplinas = [];
+  // Estados dos dropdowns (IDs)
+  String? _cursoSelecionado;
+  String? _disciplinaSelecionada;
+  
+  // Agora é uma lista para seleção múltipla de conteúdos
+  // Esta lista é de 'String' (não-anulável)
+  List<String> _conteudosSelecionados = [];
+
+  // Listas de dados (agora usam models)
+  List<Course> _cursos = [];
+  List<Discipline> _disciplinas = [];
+  List<Content> _conteudos = [];
+
+  // Listas filtradas para os dropdowns
+  List<Content> _conteudosFiltrados = [];
+
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _testarConexaoFirebase();
-    _carregarCursos();
-    _carregarDisciplinas();
+    _carregarDados();
   }
 
-  /// Testa a conexão com o Firebase
-  Future<void> _testarConexaoFirebase() async {
-    try {
-      print('🔥 Testando conexão com Firebase...');
-      final database = FirebaseDatabase.instance;
-      final ref = database.ref();
-      final snapshot = await ref.get();
-      print(
-        '✅ Conexão com Firebase OK - Dados disponíveis: ${snapshot.exists}',
-      );
-
-      if (snapshot.exists) {
-        print('📊 Estrutura do banco: ${snapshot.value}');
-      } else {
-        print('⚠️ Banco de dados vazio - pode ser necessário popular dados');
-        _verificarSePrecisaPopularDados();
-      }
-    } catch (e) {
-      print('❌ Erro na conexão com Firebase: $e');
-    }
-  }
-
-  /// Verifica se precisa popular dados de teste
-  Future<void> _verificarSePrecisaPopularDados() async {
-    try {
-      print('🔍 Verificando se há dados de cursos e disciplinas...');
-
-      // Verificar cursos
-      final cursosSnapshot = await FirebaseDatabase.instance
-          .ref('cursos')
-          .get();
-      print('📊 Cursos encontrados: ${cursosSnapshot.children.length}');
-
-      // Verificar disciplinas
-      final disciplinasSnapshot = await FirebaseDatabase.instance
-          .ref('disciplinas')
-          .get();
-      print(
-        '📚 Disciplinas encontradas: ${disciplinasSnapshot.children.length}',
-      );
-
-      if (cursosSnapshot.children.isEmpty ||
-          disciplinasSnapshot.children.isEmpty) {
-        print(
-          '⚠️ Dados insuficientes encontrados. Recomenda-se usar a função "Popular Dados" na tela principal.',
-        );
-        if (mounted) {
-          MessageUtils.mostrarErro(
-            context,
-            'Nenhum curso ou disciplina encontrado. Use "Popular Dados" na tela principal para adicionar dados de exemplo.',
-          );
+  /// HELPER para processar o DatabaseEvent
+  List<T> _processarSnapshot<T>(
+      DataSnapshot snapshot, T Function(DataSnapshot) fromSnapshot) {
+    final list = <T>[];
+    if (snapshot.exists && snapshot.value != null) {
+      final data = snapshot.value;
+      if (data is Map) {
+        for (final childSnapshot in snapshot.children) {
+          list.add(fromSnapshot(childSnapshot));
         }
       }
-    } catch (e) {
-      print('❌ Erro ao verificar dados: $e');
     }
+    return list;
+  }
+
+  /// Carrega Cursos, Disciplinas e Conteúdos do Firebase
+  Future<void> _carregarDados() async {
+    setState(() => _isLoading = true);
+    try {
+      // 1. Pega os streams
+      final cursosStream = _courseService.getCoursesStream();
+      final disciplinasStream = _subjectService.getSubjectsStream();
+      final conteudosStream = _contentService.getContentStream();
+
+      // 2. Espera pelo primeiro 'DatabaseEvent' de cada um
+      final results = await Future.wait([
+        cursosStream.first,
+        disciplinasStream.first,
+        conteudosStream.first,
+      ]);
+
+      // 3. Processa o 'snapshot' de cada 'DatabaseEvent'
+      final DatabaseEvent courseEvent = results[0];
+      final DatabaseEvent subjectEvent = results[1];
+      final DatabaseEvent contentEvent = results[2];
+
+      final List<Course> cursos =
+          _processarSnapshot(courseEvent.snapshot, Course.fromSnapshot);
+      final List<Discipline> disciplinas =
+          _processarSnapshot(subjectEvent.snapshot, Discipline.fromSnapshot);
+      final List<Content> conteudos =
+          _processarSnapshot(contentEvent.snapshot, Content.fromSnapshot);
+
+      if (mounted) {
+        setState(() {
+          _cursos = cursos;
+          _disciplinas = disciplinas;
+          _conteudos = conteudos;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        MessageUtils.mostrarErroFormatado(context, e);
+        print('Erro detalhado ao carregar dados: $e'); // Para depuração
+      }
+    }
+  }
+
+  /// Filtra a lista de Conteúdos com base na Disciplina (Discipline)
+  void _atualizarConteudos(String? novoIdDisciplina) {
+    setState(() {
+      _disciplinaSelecionada = novoIdDisciplina;
+      
+      // *** ALTERAÇÃO AQUI ***
+      // Limpa a lista de selecionados ao trocar a disciplina
+      _conteudosSelecionados.clear(); 
+      
+      if (novoIdDisciplina == null) {
+        _conteudosFiltrados = [];
+      } else {
+        // Filtra Conteúdos pelo 'subjectId' (ID da Disciplina)
+        _conteudosFiltrados = _conteudos
+            .where((conteudo) => conteudo.subjectId == novoIdDisciplina)
+            .toList();
+      }
+    });
   }
 
   @override
@@ -109,127 +145,6 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     _tituloController.dispose();
     _instrucoesController.dispose();
     super.dispose();
-  }
-
-  /// Carrega cursos do Firebase
-  Future<void> _carregarCursos() async {
-    try {
-      print('🔍 Iniciando carregamento de cursos...');
-      final stream = _courseService.listarCursos();
-      await for (final event in stream) {
-        print(
-          '📡 Evento de cursos recebido do Firebase: ${event.snapshot.exists}',
-        );
-        if (event.snapshot.exists) {
-          final cursos = <Map<String, dynamic>>[];
-          print(
-            '📊 Número de cursos encontrados: ${event.snapshot.children.length}',
-          );
-
-          for (final child in event.snapshot.children) {
-            final curso = {
-              'id': child.key,
-              ...Map<String, dynamic>.from(child.value as Map),
-            };
-            print(
-              '🎓 Curso carregado: ${curso['nome']} (ID: ${curso['id']}, Status: ${curso['status']})',
-            );
-            // Só adiciona cursos ativos
-            if (curso['status'] == 'ativo') {
-              cursos.add(curso);
-              print('✅ Curso ativo adicionado: ${curso['nome']}');
-            } else {
-              print('❌ Curso inativo ignorado: ${curso['nome']}');
-            }
-          }
-
-          print('✅ Total de cursos ativos processados: ${cursos.length}');
-          if (mounted) {
-            setState(() {
-              _cursos = cursos;
-            });
-            print('🔄 Estado atualizado com ${_cursos.length} cursos');
-          }
-        } else {
-          print('❌ Nenhum curso encontrado no Firebase');
-        }
-      }
-    } catch (e) {
-      print('💥 Erro ao carregar cursos: $e');
-      if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar cursos: $e');
-      }
-    }
-  }
-
-  /// Carrega disciplinas do Firebase
-  Future<void> _carregarDisciplinas() async {
-    try {
-      print('🔍 Iniciando carregamento de disciplinas...');
-      final stream = _disciplineService.listarDisciplinas();
-      await for (final event in stream) {
-        print('📡 Evento recebido do Firebase: ${event.snapshot.exists}');
-        if (event.snapshot.exists) {
-          final disciplinas = <Map<String, dynamic>>[];
-          print(
-            '📊 Número de disciplinas encontradas: ${event.snapshot.children.length}',
-          );
-
-          for (final child in event.snapshot.children) {
-            final disciplina = {
-              'id': child.key,
-              ...Map<String, dynamic>.from(child.value as Map),
-            };
-            print(
-              '📚 Disciplina carregada: ${disciplina['nome']} (ID: ${disciplina['id']}, Curso: ${disciplina['cursoId']})',
-            );
-            disciplinas.add(disciplina);
-          }
-
-          print('✅ Total de disciplinas processadas: ${disciplinas.length}');
-          if (mounted) {
-            setState(() {
-              _disciplinas = disciplinas;
-            });
-            print(
-              '🔄 Estado atualizado com ${_disciplinas.length} disciplinas',
-            );
-          }
-        } else {
-          print('❌ Nenhuma disciplina encontrada no Firebase');
-        }
-      }
-    } catch (e) {
-      print('💥 Erro ao carregar disciplinas: $e');
-      if (mounted) {
-        MessageUtils.mostrarErro(context, 'Erro ao carregar disciplinas: $e');
-      }
-    }
-  }
-
-  /// Filtra disciplinas por curso selecionado
-  List<Map<String, dynamic>> _getDisciplinasFiltradas() {
-    print('🔍 Filtrando disciplinas para curso: $_cursoSelecionado');
-    print('📊 Total de disciplinas disponíveis: ${_disciplinas.length}');
-
-    if (_cursoSelecionado == null) {
-      print('❌ Nenhum curso selecionado');
-      return [];
-    }
-
-    // Filtrar disciplinas pelo curso selecionado
-    final disciplinasFiltradas = _disciplinas.where((disciplina) {
-      final match = disciplina['cursoId'] == _cursoSelecionado;
-      print(
-        '🔍 Disciplina "${disciplina['nome']}" (cursoId: ${disciplina['cursoId']}) - Match: $match',
-      );
-      return match;
-    }).toList();
-
-    print(
-      '✅ Disciplinas filtradas encontradas: ${disciplinasFiltradas.length}',
-    );
-    return disciplinasFiltradas;
   }
 
   /// Valida se todos os campos obrigatórios foram preenchidos
@@ -261,7 +176,14 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => SelecionarQuestoesScreen(
-          disciplinaId: _disciplinaSelecionada!,
+          subjectId: _disciplinaSelecionada!,
+          
+          // *** ESTA É A LINHA CORRIGIDA ***
+          // Agora envia 'contentIds' (plural) com a lista.
+          contentIds: _conteudosSelecionados.isEmpty
+              ? null // Envia nulo se vazio (para carregar tudo da disciplina)
+              : List.from(_conteudosSelecionados),
+
           tituloProva: _tituloController.text.trim(),
           instrucoesProva: _instrucoesController.text.trim(),
         ),
@@ -280,53 +202,75 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
     });
 
     try {
-      final questoes = dados['questoes'] as List<Map<String, dynamic>>;
+      final questoesMaps = dados['questoes'] as List<Map<String, dynamic>>;
 
-      // Preparar questões para o exame
-      final questoesExame = <String, Map<String, dynamic>>{};
-      for (int i = 0; i < questoes.length; i++) {
-        questoesExame[questoes[i]['id']] = {'ordem': i + 1, 'peso': 1.0};
-      }
-
-      final exameId = await _examService.criarExame(
-        titulo: dados['titulo'],
-        instrucoes: dados['instrucoes'],
-        disciplinaId: _disciplinaSelecionada!,
-        configuracoes: {
-          'tempoLimite': 3600, // 1 hora em segundos
-          'permiteVoltar': true,
-          'mostraRespostas': false,
-          'pesoTotal': questoes.length.toDouble(),
-          'permiteConsultarMaterial': false,
-          'ordemQuestoes': 'sequencial',
-          'mostraProgresso': true,
-          'questoes': questoesExame,
-        },
+      // ETAPA 1: Criar a "casca" da prova
+      final String exameId = await _examService.createExam(
+        title: dados['titulo'],
+        instructions: dados['instrucoes'],
+        subjectId: _disciplinaSelecionada, // 'subjectId' é o ID da Disciplina
       );
 
-      if (exameId != null) {
+      // ETAPA 2: Salvar o ID do curso E CONTEÚDOS na prova (como pedido)
+      await _examService.updateExam(exameId, {
+        'courseId': _cursoSelecionado,
+        'contentIds': _conteudosSelecionados,
+      });
+      // ETAPA 3: Adicionar as questões à prova, uma por uma
+      bool allQuestionsAdded = true;
+      for (int i = 0; i < questoesMaps.length; i++) {
+        final questaoMap = questoesMaps[i];
+        final String questionId = questaoMap['id'];
+        final int order = i + 1;
+        final double peso =
+            questaoMap['peso'] ?? 0.0; // Pega o peso do map
+
+        // Chama o service com o 'peso'
+        try {
+          await _examService.addQuestionToExam(
+            examId: exameId,
+            questionId: questionId,
+            number: order,
+            peso: peso,
+            suggestedLines: null,
+          );
+        } catch (e) {
+          allQuestionsAdded = false;
+          // Log do erro, mas continua tentando adicionar as outras questões
+          print('Erro ao adicionar questão $questionId: $e');
+        }
+      }
+
+      if (allQuestionsAdded) {
         MessageUtils.mostrarSucesso(
           context,
-          'Prova criada com sucesso com ${questoes.length} questões!',
+          'Prova criada com sucesso com ${questoesMaps.length} questões!',
         );
-        Navigator.pop(context, true); // Retorna true para indicar sucesso
       } else {
-        MessageUtils.mostrarErro(context, 'Erro ao criar prova');
+        MessageUtils.mostrarErro(
+          context,
+          'Prova criada, mas algumas questões falharam ao ser adicionadas.',
+        );
       }
+
+      Navigator.pop(context, true);
     } catch (e) {
-      MessageUtils.mostrarErro(context, 'Erro ao criar prova: $e');
+      if (mounted) {
+        MessageUtils.mostrarErroFormatado(context, e);
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  /// Cria um container reutilizável com estilo padrão
   Widget _buildContainer({required Widget child, double? height}) {
     return Container(
       width: double.infinity,
-      height: height ?? 50,
+      height: height, // Altura automática (nula) permite o ExpansionTile crescer
       decoration: BoxDecoration(
         color: _whiteColor,
         borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
@@ -348,7 +292,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       backgroundColor: _backgroundColor,
       body: Column(
         children: [
-          // Header com logo e botão voltar
+          // Header
           Container(
             width: double.infinity,
             height: 100,
@@ -364,7 +308,6 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
             ),
             child: Stack(
               children: [
-                // Logo centralizado
                 Center(
                   child: Image.asset(
                     'assets/images/logo.png',
@@ -393,7 +336,6 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                     },
                   ),
                 ),
-                // Botão voltar
                 Positioned(
                   left: 16,
                   top: 0,
@@ -407,10 +349,6 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
                         size: 28,
                       ),
                       tooltip: 'Voltar',
-                      style: IconButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        shape: const CircleBorder(),
-                      ),
                     ),
                   ),
                 ),
@@ -419,222 +357,277 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
           ),
           // Conteúdo principal
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppConstants.defaultPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Título
-                  const Center(
-                    child: Text(
-                      'Criar Nova Prova',
-                      style: TextStyle(
-                        color: _textColor,
-                        fontFamily: 'Inter-Bold',
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Campo Curso
-                  const Text(
-                    'Curso',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontFamily: 'Inter-Bold',
-                      fontSize: 25,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildContainer(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _cursoSelecionado,
-                        hint: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'Selecione o curso',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w300,
-                            ),
-                          ),
-                        ),
-                        items: _cursos.map((curso) {
-                          return DropdownMenuItem<String>(
-                            value: curso['id'],
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Text(curso['nome'] ?? 'Curso sem nome'),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _cursoSelecionado = newValue;
-                            _disciplinaSelecionada =
-                                null; // Reset disciplina quando curso muda
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Campo Disciplina
-                  const Text(
-                    'Disciplina',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontFamily: 'Inter-Bold',
-                      fontSize: 25,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildContainer(
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _disciplinaSelecionada,
-                        hint: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'Selecione a disciplina',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w300,
-                            ),
-                          ),
-                        ),
-                        items: _getDisciplinasFiltradas().map((disciplina) {
-                          return DropdownMenuItem<String>(
-                            value: disciplina['id'],
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Text(
-                                disciplina['nome'] ?? 'Disciplina sem nome',
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: _cursoSelecionado != null
-                            ? (String? newValue) {
-                                setState(() {
-                                  _disciplinaSelecionada = newValue;
-                                });
-                              }
-                            : null,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Campo Título
-                  const Text(
-                    'Título da Prova',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontFamily: 'Inter-Bold',
-                      fontSize: 25,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildContainer(
-                    height: 100,
-                    child: TextField(
-                      controller: _tituloController,
-                      decoration: const InputDecoration(
-                        hintText: 'Digite o título da prova',
-                        hintStyle: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w300,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.all(16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Campo de instruções
-                  _buildContainer(
-                    height: 100,
-                    child: TextField(
-                      controller: _instrucoesController,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        hintText: 'Digite as instruções da prova',
-                        hintStyle: TextStyle(
-                          color: Colors.black54,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w300,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Botões de Ação
-                  Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: _primaryColor))
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ElevatedButton(
-                          onPressed: _isLoading ? null : _selecionarQuestoes,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _primaryColor,
-                            foregroundColor: _whiteColor,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 16,
+                        const Center(
+                          child: Text(
+                            'Criar Nova Prova',
+                            style: TextStyle(
+                              color: _textColor,
+                              fontFamily: 'Inter-Bold',
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 4,
                           ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  'Selecionar Questões',
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Campo Título da Prova
+                        const Text(
+                          'Título da Prova',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          height: 50,
+                          child: TextField(
+                            controller: _tituloController,
+                            decoration: const InputDecoration(
+                              hintText: 'Digite o título da prova',
+                              hintStyle: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w300,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Campo de instruções
+                        const Text(
+                          'Instruções',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          height: 100,
+                          child: TextField(
+                            controller: _instrucoesController,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                              hintText: 'Digite as instruções da prova',
+                              hintStyle: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w300,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // *** CAMPO CURSO ***
+                        const Text(
+                          'Curso (Obrigatório)',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          height: 50, // Altura fixa para dropdown
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String?>( // Tipo anulável
+                              isExpanded: true,
+                              value: _cursoSelecionado,
+                              hint: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Selecione o curso',
                                   style: TextStyle(
+                                    color: Colors.black54,
                                     fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w300,
                                   ),
                                 ),
+                              ),
+                              items: _cursos.map((Course curso) {
+                                return DropdownMenuItem<String?>( // Tipo anulável
+                                  value: curso.id,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Text(curso.name),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                setState(() {
+                                  _cursoSelecionado = newValue;
+                                });
+                              },
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: 32),
+
+                        // *** CAMPO DISCIPLINA ***
+                        const Text(
+                          'Disciplina (Obrigatório)',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          height: 50, // Altura fixa para dropdown
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String?>( // Tipo anulável
+                              isExpanded: true,
+                              value: _disciplinaSelecionada,
+                              hint: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Selecione a disciplina',
+                                  style: TextStyle(
+                                    color: Colors.black54,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w300,
+                                  ),
+                                ),
+                              ),
+                              items: _disciplinas.map((Discipline disciplina) {
+                                return DropdownMenuItem<String?>( // Tipo anulável
+                                  value: disciplina.id,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    child: Text(disciplina.name),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                _atualizarConteudos(newValue);
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // *** CAMPO CONTEÚDO (MÚLTIPLA SELEÇÃO) ***
+                        const Text(
+                          'Conteúdo (Opcional)',
+                          style: TextStyle(
+                            color: _textColor,
+                            fontFamily: 'Inter-Bold',
+                            fontSize: 25,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildContainer(
+                          // A altura agora é nula (automática) para o ExpansionTile
+                          height: null, 
+                          child: ExpansionTile(
+                            title: Text(
+                              _conteudosSelecionados.isEmpty
+                                  ? (_disciplinaSelecionada == null
+                                      ? 'Selecione uma disciplina primeiro'
+                                      : 'Selecione os conteúdos (opcional)')
+                                  : '${_conteudosSelecionados.length} conteúdo(s) selecionado(s)',
+                              style: TextStyle(
+                                color: _conteudosSelecionados.isEmpty && _disciplinaSelecionada != null
+                                    ? Colors.black54
+                                    : (_disciplinaSelecionada == null ? Colors.grey : _textColor),
+                                fontSize: 16,
+                                fontWeight: _conteudosSelecionados.isEmpty
+                                    ? FontWeight.w300
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            
+                            // *** INÍCIO DA CORREÇÃO ***
+                            children: _disciplinaSelecionada == null
+                                ? [] // Não mostra nada se a disciplina não estiver selecionada
+                                : _conteudosFiltrados
+                                    .where((c) => c.id != null) // 1. Filtra IDs nulos
+                                    .map((Content conteudo) {
+                                      // 2. Agora temos certeza que conteudo.id não é nulo
+                                      final String contentId = conteudo.id!; 
+
+                                      return CheckboxListTile(
+                                        title: Text(conteudo.description),
+                                        // 3. Usa a variável não-anulável 'contentId'
+                                        value: _conteudosSelecionados.contains(contentId),
+                                        onChanged: (bool? value) {
+                                          setState(() {
+                                            if (value == true) {
+                                              _conteudosSelecionados.add(contentId);
+                                            } else {
+                                              _conteudosSelecionados.remove(contentId);
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                            // *** FIM DA CORREÇÃO ***
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Botão de Ação
+                        Center(
+                          child: ElevatedButton(
+                            onPressed:
+                                _isLoading ? null : _selecionarQuestoes,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primaryColor,
+                              foregroundColor: _whiteColor,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 4,
+                            ),
+                            child: const Text(
+                              'Selecionar Questões',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 32),
-                ],
-              ),
-            ),
           ),
         ],
       ),

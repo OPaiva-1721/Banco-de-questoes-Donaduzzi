@@ -1,0 +1,186 @@
+app:
+  id: com.exemplo.prova
+  name: Sistema de Provas - Projeto Integrador
+
+permissions:
+  - name: android.permission.INTERNET
+    type: normal
+    feature: Comunicação com Firebase (Auth, Database)
+    data_min: Conexão de rede ativa para comunicação com servidores Firebase
+    request_timing: Instalação (permissão de instalação, não requer pedido em runtime)
+    rationale: |
+      Necessária para comunicação com serviços Firebase (Authentication e Realtime Database).
+      Sem esta permissão, o app não pode autenticar usuários nem sincronizar dados de provas,
+      questões e disciplinas. É essencial para o funcionamento básico do sistema.
+    alternative: |
+      Modo offline limitado: implementar cache local de dados essenciais usando
+      SharedPreferences ou banco local (SQLite/Hive) para permitir visualização básica
+      quando offline. Sincronização ocorre quando conexão é restabelecida.
+    storage: |
+      Dados transmitidos via HTTPS/TLS. Credenciais nunca armazenadas em texto plano.
+      Tokens de autenticação gerenciados pelo Firebase SDK. Dados acadêmicos não são
+      considerados sensíveis, mas são protegidos por regras de segurança do Firebase.
+    play_policy: |
+      Declaração Google Play: "Comunicação com serviços Firebase para autenticação
+      e sincronização de dados educacionais. Necessária para funcionamento do app."
+
+  - name: android.permission.ACCESS_NETWORK_STATE
+    type: normal
+    feature: Verificação de conectividade de rede
+    data_min: Status da conexão de rede (conectado/desconectado, WiFi/dados móveis)
+    request_timing: Instalação (permissão de instalação, não requer pedido em runtime)
+    rationale: |
+      Permite verificar o estado da conexão de rede antes de realizar operações que
+      requerem internet. Melhora a experiência do usuário ao evitar tentativas de
+      operações que falhariam sem conexão, mostrando mensagens apropriadas.
+    alternative: |
+      Assumir conectividade e tratar erros de rede quando ocorrerem. Mostrar mensagens
+      de erro genéricas quando operações falharem por falta de conexão.
+    storage: |
+      Apenas leitura do status de conexão. Nenhum dado sensível é coletado ou armazenado.
+      Informação usada apenas para otimizar comportamento do app.
+    play_policy: |
+      Declaração Google Play: "Verificação de conectividade para otimizar experiência
+      do usuário e evitar operações desnecessárias quando offline."
+
+  - name: android.permission.WRITE_EXTERNAL_STORAGE
+    type: dangerous
+    feature: Geração e salvamento de PDFs de provas
+    data_min: Acesso ao armazenamento externo para salvar arquivos PDF
+    request_timing: |
+      Runtime (apenas Android < 10): Pedido quando usuário tenta gerar PDF pela primeira vez.
+      Mensagem: "Precisamos salvar o PDF da prova no seu dispositivo. Permitir acesso ao armazenamento?"
+      Android 10+: Usa Scoped Storage (não requer permissão dangerous)
+    rationale: |
+      Permite salvar PDFs de provas geradas no armazenamento do dispositivo para impressão
+      ou compartilhamento posterior. Funcionalidade essencial para professores que precisam
+      imprimir provas ou compartilhá-las com outros professores.
+    alternative: |
+      Android 10+: Usar Scoped Storage (MediaStore API) que não requer permissão dangerous.
+      Para todas as versões: Oferecer compartilhamento direto via Intent (ACTION_SEND) sem
+      salvar no dispositivo. Usuário pode escolher app de compartilhamento (email, drive, etc.)
+      ou apenas visualizar o PDF sem salvar.
+    storage: |
+      PDFs gerados temporariamente em cache do app. Usuário escolhe destino final.
+      Dados acadêmicos não são considerados sensíveis, mas são protegidos por regras
+      de acesso do Firebase. PDFs podem ser deletados pelo usuário a qualquer momento.
+    play_policy: |
+      Declaração Google Play: "Salvar e compartilhar provas em formato PDF para impressão
+      e distribuição. Usado apenas quando usuário solicita geração de PDF."
+
+  - name: android.permission.POST_NOTIFICATIONS
+    type: dangerous
+    feature: Notificações push via Firebase Messaging
+    data_min: Capacidade de exibir notificações no sistema de notificações do Android
+    request_timing: |
+      Runtime (Android 13+): Pedido na primeira vez que o app tenta exibir notificação.
+      Mensagem: "Permitir que o app exiba notificações sobre novas provas e atualizações?"
+      Android < 13: Não requer pedido (permissão automática)
+    rationale: |
+      Permite que o app exiba notificações push sobre novas provas criadas, lembretes de
+      provas agendadas, atualizações do sistema e outras informações relevantes para professores
+      e coordenadores. Melhora engajamento e comunicação com usuários.
+    alternative: |
+      Notificações in-app apenas. Usuário pode verificar manualmente por novas provas e
+      atualizações dentro do app. Funcionalidade principal não é afetada.
+    storage: |
+      Tokens de notificação gerenciados pelo Firebase Cloud Messaging.
+      Apenas dados de identificação do dispositivo são enviados ao Firebase.
+      Usuário pode desativar notificações a qualquer momento nas configurações do app.
+    play_policy: |
+      Declaração Google Play: "Notificações sobre novas provas, lembretes e atualizações
+      do sistema educacional. Usuário pode desativar a qualquer momento."
+
+  - name: android.permission.READ_MEDIA_IMAGES
+    type: dangerous
+    feature: Upload de imagens para questões educacionais
+    data_min: Acesso a imagens armazenadas na galeria do dispositivo (Android 13+)
+    request_timing: |
+      Runtime (Android 13+): Pedido quando usuário tenta adicionar imagem a uma questão.
+      Mensagem: "Precisamos acessar suas imagens para adicionar fotos às questões. Permitir?"
+      Android < 13: Usa READ_EXTERNAL_STORAGE
+    rationale: |
+      Permite que professores adicionem imagens, diagramas e fotos às questões educacionais,
+      enriquecendo o conteúdo das provas. Funcionalidade importante para questões que requerem
+      visualização de gráficos, diagramas ou imagens explicativas.
+    alternative: |
+      Inserir URL de imagem manualmente (se imagem estiver hospedada online).
+      Criar questões apenas com texto, sem imagens.
+      Usar apenas texto descritivo para substituir necessidade de imagens.
+    storage: |
+      Imagens selecionadas são enviadas para Firebase Storage.
+      Usuário escolhe quais imagens compartilhar.
+      Imagens não são armazenadas localmente após upload.
+      URLs das imagens são armazenadas no Realtime Database.
+    play_policy: |
+      Declaração Google Play: "Acesso a imagens para adicionar fotos e diagramas às questões
+      educacionais. Usado apenas quando professor solicita adicionar imagem."
+
+  - name: android.permission.READ_EXTERNAL_STORAGE
+    type: dangerous
+    feature: Upload de imagens para questões (Android < 13)
+    data_min: Acesso a arquivos de imagem no armazenamento externo (Android < 13)
+    request_timing: |
+      Runtime (Android < 13): Pedido quando usuário tenta adicionar imagem a uma questão.
+      Mensagem: "Precisamos acessar suas imagens para adicionar fotos às questões. Permitir?"
+      Android 13+: Substituída por READ_MEDIA_IMAGES
+    rationale: |
+      Permite que professores adicionem imagens às questões em dispositivos Android < 13.
+      Necessária para compatibilidade com versões antigas do Android.
+    alternative: |
+      Inserir URL de imagem manualmente.
+      Criar questões apenas com texto.
+      Atualizar dispositivo para Android 13+ para usar READ_MEDIA_IMAGES (mais granular).
+    storage: |
+      Imagens selecionadas são enviadas para Firebase Storage.
+      Usuário escolhe quais imagens compartilhar.
+      Imagens não são armazenadas localmente após upload.
+    play_policy: |
+      Declaração Google Play: "Acesso a imagens para adicionar fotos às questões educacionais
+      (apenas Android < 13). Usado apenas quando professor solicita adicionar imagem."
+
+  - name: android.permission.CAMERA
+    type: dangerous
+    feature: Captura de fotos para questões educacionais
+    data_min: Acesso à câmera do dispositivo para capturar fotos
+    request_timing: |
+      Runtime: Pedido quando usuário clica em "Tirar foto" ao adicionar imagem a uma questão.
+      Mensagem: "Precisamos usar a câmera para tirar fotos para as questões. Permitir?"
+    rationale: |
+      Permite que professores capturem fotos diretamente com a câmera do dispositivo para
+      adicionar às questões. Útil para capturar diagramas escritos à mão, fotos de objetos
+      ou situações que precisam ser documentadas para questões educacionais.
+    alternative: |
+      Selecionar imagem da galeria do dispositivo.
+      Usar apenas texto descritivo nas questões.
+      Inserir URL de imagem hospedada online.
+    storage: |
+      Fotos capturadas são enviadas imediatamente para Firebase Storage.
+      Fotos não são salvas na galeria do dispositivo (a menos que usuário escolha).
+      URLs das fotos são armazenadas no Realtime Database.
+      Fotos podem ser deletadas pelo usuário a qualquer momento.
+    play_policy: |
+      Declaração Google Play: "Captura de fotos para adicionar imagens às questões educacionais.
+      Usado apenas quando professor solicita tirar foto."
+
+  - name: android.permission.WAKE_LOCK
+    type: normal
+    feature: Manter dispositivo acordado durante aplicação de provas
+    data_min: Capacidade de prevenir que a tela desligue automaticamente
+    request_timing: Instalação (permissão de instalação, não requer pedido em runtime)
+    rationale: |
+      Permite que o app mantenha a tela ativa durante a aplicação de provas, garantindo
+      que alunos não percam progresso caso a tela desligue. Melhora experiência do usuário
+      durante atividades que requerem atenção contínua.
+    alternative: |
+      Usuário deve manter tela ativa manualmente (configurações do sistema).
+      Exibir notificações de inatividade se tela desligar.
+      Funcionalidade opcional; app funciona normalmente sem esta permissão.
+    storage: |
+      Wake lock é ativado apenas durante aplicação de provas.
+      Desativado automaticamente ao finalizar ou sair da prova.
+      Não coleta ou armazena dados sensíveis.
+    play_policy: |
+      Declaração Google Play: "Manter tela ativa durante aplicação de provas para garantir
+      experiência contínua. Usado apenas durante provas ativas."
+

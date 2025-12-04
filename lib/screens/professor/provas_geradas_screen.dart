@@ -1,7 +1,24 @@
 import 'package:flutter/material.dart';
-import '../../services/exam_service.dart';
-import '../../services/discipline_service.dart';
-import '../../utils/message_utils.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'dart:async';
+
+// Imports do projeto
+import 'package:prova/services/exam_service.dart';
+import 'package:prova/services/pdf_service.dart';
+import 'package:prova/models/exam_model.dart';
+import 'package:prova/utils/message_utils.dart';
+import 'package:prova/core/app_colors.dart';
+import 'package:prova/core/exceptions/app_exceptions.dart';
+import 'package:prova/services/course_service.dart';
+import 'package:prova/models/course_model.dart';
+import 'package:prova/services/subject_service.dart';
+import 'package:prova/models/discipline_model.dart';
+
+// Imports para o filtro de conteúdo
+import 'package:prova/services/content_service.dart';
+import 'package:prova/models/content_model.dart';
+
+import 'package:prova/screens/professor/editar_prova_screen.dart';
 
 class ProvasGeradasScreen extends StatefulWidget {
   const ProvasGeradasScreen({super.key});
@@ -11,21 +28,38 @@ class ProvasGeradasScreen extends StatefulWidget {
 }
 
 class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
-  // Constantes de cores
-  static const Color _primaryColor = Color(0xFF541822);
-  static const Color _backgroundColor = Color(0xFFF5F5F5);
-  static const Color _textColor = Color(0xFF333333);
-  static const Color _whiteColor = Colors.white;
+  static const Color _primaryColor = AppColors.primary;
+  static const Color _backgroundColor = AppColors.background;
+  static const Color _textColor = AppColors.text;
+  static const Color _whiteColor = AppColors.white;
 
-  // Serviços
   final ExamService _examService = ExamService();
-  final DisciplineService _disciplineService = DisciplineService();
+  final CourseService _courseService = CourseService();
+  final SubjectService _subjectService = SubjectService();
+  final ContentService _contentService = ContentService();
 
-  // Estados
-  List<Map<String, dynamic>> _provas = [];
-  List<Map<String, dynamic>> _disciplinas = [];
   bool _isLoading = true;
-  String _filtroStatus = 'todas';
+
+  // Listas Master e Filtrada
+  List<Exam> _provasMaster = []; // Guarda todas as provas
+  List<Exam> _provasFiltradas = []; // Guarda as provas para exibição
+
+  // Mapas para consulta de nomes (para o PDF e Filtros)
+  Map<String, Course> _cursosMap = {};
+  Map<String, Discipline> _disciplinasMap = {};
+  Map<String, Content> _conteudosMap = {};
+
+  // Listas de dados para popular os filtros
+  List<Course> _todosCursos = [];
+  List<Discipline> _todasDisciplinas = [];
+  List<Content> _todosConteudos = [];
+
+  // Estados para os Filtros
+  String? _filtroCursoId;
+  String? _filtroDisciplinaId;
+  final TextEditingController _autorController = TextEditingController();
+  final TextEditingController _numQuestoesController = TextEditingController();
+  List<String> _filtroConteudosSelecionados = []; // Filtro de multi-seleção
 
   @override
   void initState() {
@@ -33,149 +67,589 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
     _carregarDados();
   }
 
-  /// Carrega provas e disciplinas do Firebase
+  @override
+  void dispose() {
+    _autorController.dispose();
+    _numQuestoesController.dispose();
+    super.dispose();
+  }
+
+  List<T> _processarSnapshot<T>(
+    DataSnapshot snapshot,
+    T Function(DataSnapshot) fromSnapshot,
+  ) {
+    final list = <T>[];
+    if (snapshot.exists && snapshot.value != null) {
+      final data = snapshot.value;
+      if (data is Map) {
+        for (final childSnapshot in snapshot.children) {
+          try {
+            list.add(fromSnapshot(childSnapshot));
+          } catch (e) {
+            // Se um item falhar na conversão (ex: erro de tipo), loga e continua
+            print('Erro ao processar item ${childSnapshot.key}: $e');
+          }
+        }
+      }
+    }
+    return list;
+  }
+
+  // Carrega todos os dados (Provas, Cursos, Disciplinas, Conteúdos)
   Future<void> _carregarDados() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) setState(() => _isLoading = true);
 
     try {
-      // Carregar disciplinas
-      await _carregarDisciplinas();
+      final examsStream = _examService.getExamsStream();
+      final coursesStream = _courseService.getCoursesStream();
+      final subjectsStream = _subjectService.getSubjectsStream();
+      final contentsStream = _contentService.getContentStream();
 
-      // Carregar provas
-      await _carregarProvas();
-    } catch (e) {
-      MessageUtils.mostrarErro(context, 'Erro ao carregar dados: $e');
-    } finally {
+      final results = await Future.wait([
+        examsStream.first,
+        coursesStream.first,
+        subjectsStream.first,
+        contentsStream.first,
+      ]);
+
+      final DatabaseEvent examsEvent = results[0];
+      final DatabaseEvent coursesEvent = results[1];
+      final DatabaseEvent subjectsEvent = results[2];
+      final DatabaseEvent contentsEvent = results[3];
+
+      // Processa com o helper que agora ignora itens com erro
+      final List<Exam> tempProvas = _processarSnapshot(
+        examsEvent.snapshot,
+        Exam.fromSnapshot,
+      );
+      final List<Course> tempCourses = _processarSnapshot(
+        coursesEvent.snapshot,
+        Course.fromSnapshot,
+      );
+      final List<Discipline> tempSubjects = _processarSnapshot(
+        subjectsEvent.snapshot,
+        Discipline.fromSnapshot,
+      );
+      final List<Content> tempContents = _processarSnapshot(
+        contentsEvent.snapshot,
+        Content.fromSnapshot,
+      );
+
+      // Cria os mapas de consulta
+      final Map<String, Course> tempCursosMap = {
+        for (var c in tempCourses.where((c) => c.id != null)) c.id!: c,
+      };
+      final Map<String, Discipline> tempDisciplinasMap = {
+        for (var d in tempSubjects.where((d) => d.id != null)) d.id!: d,
+      };
+      final Map<String, Content> tempConteudosMap = {
+        for (var c in tempContents.where((c) => c.id != null)) c.id!: c,
+      };
+
+      // Ordena as provas
+      tempProvas.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
       if (mounted) {
         setState(() {
+          _provasMaster = tempProvas;
+          _cursosMap = tempCursosMap;
+          _disciplinasMap = tempDisciplinasMap;
+          _conteudosMap = tempConteudosMap;
+          _todosCursos = tempCourses;
+          _todasDisciplinas = tempSubjects;
+          _todosConteudos = tempContents;
           _isLoading = false;
         });
-      }
-    }
-  }
-
-  /// Carrega disciplinas do Firebase
-  Future<void> _carregarDisciplinas() async {
-    try {
-      final stream = _disciplineService.listarDisciplinas();
-      await for (final event in stream) {
-        if (event.snapshot.exists) {
-          final disciplinas = <Map<String, dynamic>>[];
-          for (final child in event.snapshot.children) {
-            final disciplina = {
-              'id': child.key,
-              ...Map<String, dynamic>.from(child.value as Map),
-            };
-            disciplinas.add(disciplina);
-          }
-          if (mounted) {
-            setState(() {
-              _disciplinas = disciplinas;
-            });
-          }
-        }
+        _aplicarFiltros(); // Aplica os filtros
       }
     } catch (e) {
-      print('Erro ao carregar disciplinas: $e');
-    }
-  }
-
-  /// Carrega provas do Firebase
-  Future<void> _carregarProvas() async {
-    try {
-      final stream = _examService.listarExames();
-      await for (final event in stream) {
-        if (event.snapshot.exists) {
-          final provas = <Map<String, dynamic>>[];
-          for (final child in event.snapshot.children) {
-            final prova = {
-              'id': child.key,
-              ...Map<String, dynamic>.from(child.value as Map),
-            };
-            provas.add(prova);
-          }
-          if (mounted) {
-            setState(() {
-              _provas = provas;
-            });
-          }
-        }
+      if (mounted) {
+        setState(() => _isLoading = false);
+        MessageUtils.mostrarErroFormatado(context, e);
+        print('Erro detalhado ao carregar dados: $e');
       }
+    }
+  }
+
+  /// Aplica todos os filtros selecionados
+  void _aplicarFiltros() {
+    List<Exam> filtradas = List.from(_provasMaster);
+
+    final String autor = _autorController.text.trim().toLowerCase();
+    final int? numQuestoes = int.tryParse(_numQuestoesController.text.trim());
+
+    if (_filtroCursoId != null) {
+      filtradas = filtradas.where((p) => p.courseId == _filtroCursoId).toList();
+    }
+    if (_filtroDisciplinaId != null) {
+      filtradas = filtradas
+          .where((p) => p.subjectId == _filtroDisciplinaId)
+          .toList();
+    }
+    if (autor.isNotEmpty) {
+      filtradas = filtradas
+          .where((p) => p.createdBy.toLowerCase().contains(autor))
+          .toList();
+    }
+    if (numQuestoes != null && numQuestoes > 0) {
+      filtradas = filtradas
+          .where((p) => p.questions.length == numQuestoes)
+          .toList();
+    }
+
+    // Filtro de Conteúdo (Multi-Select)
+    if (_filtroConteudosSelecionados.isNotEmpty) {
+      final Set<String> filtroSet = _filtroConteudosSelecionados.toSet();
+      filtradas = filtradas.where((prova) {
+        // Mostra a prova se *qualquer* um dos seus contentIds
+        // estiver na lista de filtros selecionados.
+        return prova.contentIds.any(
+          (examContentId) => filtroSet.contains(examContentId),
+        );
+      }).toList();
+    }
+
+    setState(() {
+      _provasFiltradas = filtradas;
+    });
+  }
+
+  /// Limpa todos os filtros e reseta a lista
+  void _limparFiltros() {
+    setState(() {
+      _filtroCursoId = null;
+      _filtroDisciplinaId = null;
+      _autorController.clear();
+      _numQuestoesController.clear();
+      _filtroConteudosSelecionados.clear();
+      _provasFiltradas = List.from(_provasMaster);
+    });
+  }
+
+  /// Gera o PDF da prova
+  Future<void> _gerarPdf(Exam prova) async {
+    final String nomeCurso =
+        _cursosMap[prova.courseId]?.name ?? 'Curso não informado';
+    final String nomeMateria =
+        _disciplinasMap[prova.subjectId]?.name ?? 'Disciplina não informada';
+
+    try {
+      await PdfService.gerarProvaPdf(
+        prova: prova,
+        nomeCurso: nomeCurso,
+        nomeMateria: nomeMateria,
+      );
     } catch (e) {
-      print('Erro ao carregar provas: $e');
+      if (mounted) {
+        MessageUtils.mostrarErroFormatado(context, e);
+      }
     }
   }
 
-  /// Filtra provas baseado no status
-  List<Map<String, dynamic>> _getProvasFiltradas() {
-    if (_filtroStatus == 'todas') {
-      return _provas;
-    }
-    return _provas.where((prova) => prova['status'] == _filtroStatus).toList();
-  }
-
-  /// Obtém o nome da disciplina pelo ID
-  String _getNomeDisciplina(String? disciplinaId) {
-    if (disciplinaId == null) return 'Disciplina não encontrada';
-
-    final disciplina = _disciplinas.firstWhere(
-      (d) => d['id'] == disciplinaId,
-      orElse: () => {'nome': 'Disciplina não encontrada'},
+  /// Navega para a tela de edição
+  Future<void> _editarProva(Exam prova) async {
+    final bool? foiAtualizado = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => EditarProvaScreen(prova: prova)),
     );
 
-    return disciplina['nome'] ?? 'Disciplina não encontrada';
-  }
-
-  /// Formata a data de criação
-  String _formatarData(dynamic timestamp) {
-    if (timestamp == null) return 'Data não disponível';
-
-    try {
-      final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
-      return 'Data inválida';
+    // Se a tela de edição retornar 'true', atualiza a lista
+    if (foiAtualizado == true && mounted) {
+      MessageUtils.mostrarSucesso(context, 'Prova atualizada com sucesso!');
+      _carregarDados(); // Recarrega os dados e aplica filtros
     }
   }
 
-  /// Deleta uma prova
-  Future<void> _deletarProva(Map<String, dynamic> prova) async {
-    final confirmacao = await showDialog<bool>(
+  /// Deleta a prova (com confirmação)
+  Future<void> _deletarProva(String provaId) async {
+    final bool? confirmar = await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar exclusão'),
-        content: Text(
-          'Tem certeza que deseja deletar a prova:\n"${prova['titulo']}"?',
-        ),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirmar Exclusão'),
+        content: const Text('Tem certeza de que deseja deletar esta prova?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Deletar'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Deletar', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
 
-    if (confirmacao == true) {
+    if (confirmar == true) {
       try {
-        final sucesso = await _examService.deletarExame(prova['id']);
-        if (sucesso) {
-          MessageUtils.mostrarSucesso(context, 'Prova deletada com sucesso!');
-          _carregarDados(); // Recarregar dados
-        } else {
-          MessageUtils.mostrarErro(context, 'Erro ao deletar prova');
+        await _examService.deleteExam(provaId);
+        if (mounted) {
+          MessageUtils.mostrarSucesso(context, 'Prova deletada com sucesso');
+          _carregarDados(); // Recarrega os dados e aplica filtros
         }
       } catch (e) {
-        MessageUtils.mostrarErro(context, 'Erro ao deletar prova: $e');
+        if (mounted) {
+          MessageUtils.mostrarErroFormatado(context, e);
+        }
       }
     }
+  }
+
+  // Helper para buscar os nomes dos conteúdos
+  String _getNomesConteudos(List<String> contentIds) {
+    if (contentIds.isEmpty) {
+      return 'Não especificado';
+    }
+    List<String> nomes = [];
+    for (String id in contentIds) {
+      nomes.add(_conteudosMap[id]?.description ?? 'ID:$id');
+    }
+    return nomes.join(', ');
+  }
+
+  // Card da prova (Mostrando os conteúdos)
+  Widget _buildProvaCard(Exam prova) {
+    final String nomeAutor = prova.createdBy.isNotEmpty
+        ? prova.createdBy
+        : 'Autor desconhecido';
+    final String nomeCurso = _cursosMap[prova.courseId]?.name ?? '...';
+    final String nomeMateria = _disciplinasMap[prova.subjectId]?.name ?? '...';
+    final String nomesConteudos = _getNomesConteudos(prova.contentIds);
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    prova.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Criado por: $nomeAutor',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Curso: $nomeCurso',
+                    style: const TextStyle(fontSize: 14, color: _textColor),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Disciplina: $nomeMateria',
+                    style: const TextStyle(fontSize: 14, color: _textColor),
+                  ),
+                  const SizedBox(height: 4),
+                  // Mostra os conteúdos
+                  Text(
+                    'Conteúdos: $nomesConteudos',
+                    style: const TextStyle(fontSize: 14, color: _textColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Questões: ${prova.questions.length}',
+                    style: const TextStyle(fontSize: 14, color: _textColor),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.picture_as_pdf,
+                    color: AppColors.primary,
+                  ),
+                  onPressed: () => _gerarPdf(prova),
+                  tooltip: 'Gerar PDF',
+                ),
+
+                // *** BOTÃO DE EDITAR ADICIONADO AQUI ***
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                  onPressed: () => _editarProva(prova),
+                  tooltip: 'Editar Prova',
+                ),
+
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () => _deletarProva(prova.id!),
+                  tooltip: 'Deletar Prova',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Painel de Filtros (Com Multi-Select de Conteúdo)
+  Widget _buildFiltrosWidget() {
+    // Filtra a lista de conteúdos para o dropdown
+    final List<Content> conteudosParaFiltro = _filtroDisciplinaId == null
+        ? _todosConteudos
+        : _todosConteudos
+              .where((c) => c.subjectId == _filtroDisciplinaId)
+              .toList();
+
+    return Container(
+      color: _whiteColor,
+      child: ExpansionTile(
+        title: const Text(
+          'Filtros de Busca',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        leading: const Icon(Icons.filter_list),
+        children: [
+          // --- INÍCIO DA CORREÇÃO (VERTICAL + HORIZONTAL) ---
+          Container(
+            // 1. Limita a altura da área de filtros
+            constraints: const BoxConstraints(
+              maxHeight: 350, // Altura máxima de 350px
+            ),
+            child: SingleChildScrollView(
+              // 2. Faz a área de filtros rolar
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize
+                      .min, // Importante para o SingleChildScrollView
+                  children: [
+                    // Filtro Curso
+                    DropdownButtonFormField<String?>(
+                      value: _filtroCursoId,
+                      isExpanded: true,
+                      hint: const Text('Filtrar por Curso'),
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _todosCursos.map((Course curso) {
+                        return DropdownMenuItem<String?>(
+                          value: curso.id,
+                          child: Text(curso.name),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _filtroCursoId = newValue;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Filtro Disciplina
+                    DropdownButtonFormField<String?>(
+                      value: _filtroDisciplinaId,
+                      isExpanded: true,
+                      hint: const Text('Filtrar por Disciplina'),
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _todasDisciplinas.map((Discipline disciplina) {
+                        return DropdownMenuItem<String?>(
+                          value: disciplina.id,
+                          child: Text(disciplina.name),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _filtroDisciplinaId = newValue;
+                          _filtroConteudosSelecionados.clear();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Filtro de Conteúdo (Multi-Select)
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ExpansionTile(
+                        title: Text(
+                          _filtroConteudosSelecionados.isEmpty
+                              ? 'Filtrar por Conteúdo (Nenhum)'
+                              : 'Filtrar por Conteúdo (${_filtroConteudosSelecionados.length} sel.)',
+                          style: TextStyle(
+                            color: _filtroDisciplinaId == null
+                                ? Colors.grey
+                                : _textColor,
+                            fontSize: 16,
+                          ),
+                        ),
+                        subtitle: _filtroDisciplinaId == null
+                            ? const Text(
+                                'Selecione uma disciplina primeiro',
+                                style: TextStyle(color: Colors.grey),
+                              )
+                            : null,
+                        children: conteudosParaFiltro.isEmpty
+                            ? [
+                                const Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Text(
+                                    'Nenhum conteúdo para esta disciplina.',
+                                  ),
+                                ),
+                              ]
+                            : conteudosParaFiltro.where((c) => c.id != null).map((
+                                content,
+                              ) {
+                                final String contentId = content.id!;
+
+                                return CheckboxListTile(
+                                  // 3. Apenas o Text. O ListTile/Column vai
+                                  // gerenciar a quebra de linha automaticamente.
+                                  title: Text(content.description),
+                                  value: _filtroConteudosSelecionados.contains(
+                                    contentId,
+                                  ),
+                                  onChanged: (bool? value) {
+                                    setState(() {
+                                      if (value == true) {
+                                        _filtroConteudosSelecionados.add(
+                                          contentId,
+                                        );
+                                      } else {
+                                        _filtroConteudosSelecionados.remove(
+                                          contentId,
+                                        );
+                                      }
+                                    });
+                                  },
+                                );
+                              }).toList(),
+                        onExpansionChanged: _filtroDisciplinaId == null
+                            ? (_) {}
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Filtro Autor
+                    TextField(
+                      controller: _autorController,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: 'Filtrar por quem criou',
+                        hintText: 'Nome do autor...',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Filtro Número de Questões
+                    TextField(
+                      controller: _numQuestoesController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        labelText: 'Nº exato de questões',
+                        hintText: 'Ex: 10',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Botões
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton(
+                          onPressed: _limparFiltros,
+                          child: const Text('Limpar Filtros'),
+                        ),
+                        ElevatedButton(
+                          onPressed: _aplicarFiltros,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _primaryColor,
+                            foregroundColor: _whiteColor,
+                          ),
+                          child: const Text('Aplicar Filtros'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // --- FIM DA CORREÇÃO ---
+        ],
+      ),
+    );
+  }
+
+  /// Lógica do corpo da lista
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: _primaryColor),
+      );
+    }
+
+    if (_provasMaster.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _carregarDados,
+        color: _primaryColor,
+        child: ListView(
+          children: [
+            SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+            Center(
+              child: Text(
+                'Nenhuma prova gerada ainda.',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_provasFiltradas.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Text(
+            'Nenhuma prova encontrada para os filtros aplicados.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _carregarDados,
+      color: _primaryColor,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(top: 8, bottom: 16),
+        itemCount: _provasFiltradas.length,
+        itemBuilder: (context, index) {
+          final prova = _provasFiltradas[index];
+          return _buildProvaCard(prova);
+        },
+      ),
+    );
   }
 
   @override
@@ -184,7 +658,6 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
       backgroundColor: _backgroundColor,
       body: Column(
         children: [
-          // Header com logo e botão voltar
           Container(
             width: double.infinity,
             height: 100,
@@ -200,7 +673,6 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
             ),
             child: Stack(
               children: [
-                // Logo centralizado
                 Center(
                   child: Image.asset(
                     'assets/images/logo.png',
@@ -229,7 +701,6 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                     },
                   ),
                 ),
-                // Botão voltar
                 Positioned(
                   left: 16,
                   top: 0,
@@ -243,315 +714,32 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                         size: 28,
                       ),
                       tooltip: 'Voltar',
-                      style: IconButton.styleFrom(
-                        backgroundColor: _primaryColor,
-                        shape: const CircleBorder(),
-                      ),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          // Conteúdo principal
-          Expanded(
-            child: Column(
-              children: [
-                // Título
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Provas Geradas',
-                        style: TextStyle(
-                          color: _textColor,
-                          fontFamily: 'Inter-Bold',
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Filtro de status
-                _buildFiltroStatus(),
-                // Lista de provas
-                Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _getProvasFiltradas().isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _getProvasFiltradas().length,
-                          itemBuilder: (context, index) {
-                            final prova = _getProvasFiltradas()[index];
-                            return _buildProvaCard(prova);
-                          },
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  /// Cria o estado vazio quando não há provas
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.quiz_outlined, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 24),
-          Text(
-            'Nenhuma prova gerada',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Crie uma nova prova para começar',
-            style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Cria o filtro de status
-  Widget _buildFiltroStatus() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _whiteColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            offset: const Offset(0, 2),
-            blurRadius: 8,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Text(
-            'Filtrar por status:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: _textColor,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              value: _filtroStatus,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-              ),
-              items: const [
-                DropdownMenuItem<String>(value: 'todas', child: Text('Todas')),
-                DropdownMenuItem<String>(
-                  value: 'rascunho',
-                  child: Text('Rascunho'),
-                ),
-                DropdownMenuItem<String>(
-                  value: 'finalizada',
-                  child: Text('Finalizada'),
-                ),
-                DropdownMenuItem<String>(
-                  value: 'aplicada',
-                  child: Text('Aplicada'),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  _filtroStatus = value ?? 'todas';
-                });
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Cria um card para cada prova
-  Widget _buildProvaCard(Map<String, dynamic> prova) {
-    final status = prova['status'] ?? 'rascunho';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: _whiteColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            offset: const Offset(0, 2),
-            blurRadius: 8,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header com status e botões
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatusChip(status),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => _deletarProva(prova),
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      tooltip: 'Deletar prova',
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        // TODO: Implementar visualização/edição da prova
-                        MessageUtils.mostrarSucesso(
-                          context,
-                          'Funcionalidade em desenvolvimento',
-                        );
-                      },
-                      icon: const Icon(Icons.visibility),
-                      color: _primaryColor,
-                      tooltip: 'Visualizar prova',
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Título da prova
-            Text(
-              prova['titulo'] ?? 'Prova sem título',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+          // Título da Página
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Provas Geradas',
+              style: TextStyle(
                 color: _textColor,
+                fontFamily: 'Inter-Bold',
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
               ),
-            ),
-            const SizedBox(height: 8),
-            // Informações da prova
-            Row(
-              children: [
-                _buildInfoChip(
-                  Icons.school,
-                  _getNomeDisciplina(prova['disciplinaId']),
-                  Colors.blue,
-                ),
-                const SizedBox(width: 8),
-                _buildInfoChip(
-                  Icons.quiz,
-                  '${prova['estatisticas']?['totalQuestoes'] ?? 0} questões',
-                  Colors.green,
-                ),
-                const SizedBox(width: 8),
-                _buildInfoChip(
-                  Icons.calendar_today,
-                  _formatarData(prova['dataCriacao']),
-                  Colors.orange,
-                ),
-              ],
-            ),
-            if (prova['instrucoes'] != null &&
-                prova['instrucoes'].isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                prova['instrucoes'],
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Cria um chip de status
-  Widget _buildStatusChip(String status) {
-    Color color;
-    String texto;
-    switch (status.toLowerCase()) {
-      case 'rascunho':
-        color = Colors.orange;
-        texto = 'Rascunho';
-        break;
-      case 'finalizada':
-        color = Colors.green;
-        texto = 'Finalizada';
-        break;
-      case 'aplicada':
-        color = Colors.blue;
-        texto = 'Aplicada';
-        break;
-      default:
-        color = Colors.grey;
-        texto = 'Rascunho';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Text(
-        texto,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: color,
-        ),
-      ),
-    );
-  }
-
-  /// Cria um chip de informação
-  Widget _buildInfoChip(IconData icon, String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: color,
             ),
           ),
+
+          // Painel de Filtros
+          _buildFiltrosWidget(),
+
+          // Conteúdo principal (Lista)
+          Expanded(child: _buildBody()),
         ],
       ),
     );

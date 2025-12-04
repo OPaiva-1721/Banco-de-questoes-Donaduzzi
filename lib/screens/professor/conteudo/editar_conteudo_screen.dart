@@ -1,0 +1,184 @@
+import 'package:flutter/material.dart';
+import '../../../models/content_model.dart';
+import '../../../services/content_service.dart';
+import '../../../utils/message_utils.dart';
+
+class EditarConteudoScreen extends StatefulWidget {
+  final Content conteudo;
+
+  const EditarConteudoScreen({super.key, required this.conteudo});
+
+  @override
+  State<EditarConteudoScreen> createState() => _EditarConteudoScreenState();
+}
+
+class _EditarConteudoScreenState extends State<EditarConteudoScreen> {
+  static const Color _primaryColor = Color(0xFF541822);
+  static const Color _backgroundColor = Color(0xFFF5F5F5);
+  static const Color _textColor = Color(0xFF333333);
+  static const Color _whiteColor = Colors.white;
+
+  final ContentService _contentService = ContentService();
+
+  late final TextEditingController _descricaoController;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _descricaoController = TextEditingController(
+      text: widget.conteudo.description,
+    );
+  }
+
+  @override
+  void dispose() {
+    _descricaoController.dispose();
+    super.dispose();
+  }
+
+  bool _validarFormulario() {
+    if (_descricaoController.text.trim().isEmpty) {
+      MessageUtils.mostrarErro(context, 'Digite a descrição do conteúdo');
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _salvarAlteracoes() async {
+    if (!_validarFormulario()) return;
+    if (widget.conteudo.id == null) {
+      MessageUtils.mostrarErro(context, 'Erro: ID do conteúdo não encontrado.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final updateData = {'description': _descricaoController.text.trim()};
+
+      final sucesso = await _contentService.updateContent(
+        widget.conteudo.id!,
+        updateData,
+      );
+
+      if (mounted) {
+        MessageUtils.mostrarSucesso(
+          context,
+          'Conteúdo atualizado com sucesso!',
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        MessageUtils.mostrarErroFormatado(context, e);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildContainer({required Widget child, double? height}) {
+    return Container(
+      width: double.infinity,
+      height: height,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _whiteColor,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      appBar: AppBar(
+        title: const Text('Editar Conteúdo'),
+        backgroundColor: _primaryColor,
+        elevation: 0,
+        foregroundColor: _whiteColor,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildContainer(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Descrição do Conteúdo',
+                    style: TextStyle(
+                      color: _textColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _descricaoController,
+                    maxLines: 5,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Ex: Introdução à álgebra linear, Vetores e matrizes...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _salvarAlteracoes,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: _whiteColor,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_whiteColor),
+                      ),
+                    )
+                  : const Text(
+                      'Salvar Alterações',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -31,9 +31,17 @@ dependencies:
   flutter:
     sdk: flutter
 
+  pdf: ^3.10.8       # Para criar o documento PDF
+  printing: ^5.12.0  # Para pré-visualizar e partilhar o PDF
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  
+  # Câmera e OCR para correção de provas
+  camera: ^0.11.0+2
+  google_mlkit_text_recognition: ^0.12.0
+  image_picker: ^1.1.2
+  image: ^4.3.0  # Para processamento de imagem e detecção de círculos
   
   # Firebase dependencies
   firebase_core: ^3.15.2
@@ -102,6 +110,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

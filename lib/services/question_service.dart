@@ -1,393 +1,485 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'security_service.dart';
+import '../models/question_model.dart';
+import '../models/option_model.dart';
+import '../models/enums.dart';
+import '../core/exceptions/app_exceptions.dart';
+import '../utils/error_messages.dart';
+import 'dart:async';
 
-/// Serviço responsável por operações com questões
 class QuestionService {
   final FirebaseDatabase _database = FirebaseDatabase.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  late final DatabaseReference _questionsRef;
+  late final DatabaseReference _subjectsRef;
+  late final DatabaseReference _contentsRef; 
+  late final DatabaseReference _examsRef;
   final SecurityService _securityService = SecurityService();
 
-  // ========== MÉTODOS DE QUESTÃO ==========
+  QuestionService() {
+    _questionsRef = _database.ref('questions');
+    _subjectsRef = _database.ref('subjects');
+    _contentsRef = _database.ref('contents');
+    _examsRef = _database.ref('exams');
+  }
 
-  /// Cria uma nova questão com opções
-  Future<String?> criarQuestao({
-    required String enunciado,
-    required String disciplinaId,
-    required Map<String, Map<String, dynamic>> opcoes,
-    String? imagemUrl,
-    String? explicacao,
-    double? peso,
-  }) async {
-    final user = _auth.currentUser;
-    if (user == null) return null;
+  void _validateQuestion(Question question) {
+    if (question.options.length != 5) {
+      throw ValidationException(ErrorMessages.questionMustHaveFiveOptions);
+    }
+
+    final correctCount = question.options
+        .where((option) => option.isCorrect)
+        .length;
+    if (correctCount != 1) {
+      throw ValidationException(ErrorMessages.questionMustHaveOneCorrectOption);
+    }
+
+    for (var option in question.options) {
+      if (option.text.trim().isEmpty) {
+        throw ValidationException(ErrorMessages.questionOptionTextRequired);
+      }
+      if (!_securityService.validateText(option.text, maxLength: 500)) {
+        throw ValidationException(ErrorMessages.invalidOptionText);
+      }
+      if (!_securityService.validateText(option.letter, maxLength: 1)) {
+        throw ValidationException(ErrorMessages.questionOptionLetterInvalid);
+      }
+    }
+  }
+
+  /// Cria uma nova questão
+  /// 
+  /// Retorna o ID da questão criada ou lança uma exceção em caso de erro.
+  /// 
+  /// Exceções possíveis:
+  /// - [ValidationException]: Dados inválidos
+  /// - [NotFoundException]: Disciplina ou conteúdo não encontrado
+  /// - [AppFirebaseException]: Erro ao salvar no Firebase
+  /// - [NetworkException]: Erro de conexão
+  Future<String> createQuestion(Question newQuestion) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      throw AuthenticationException(ErrorMessages.userNotLoggedIn);
+    }
 
     try {
-      // Validar entrada
-      if (!_securityService.validarTexto(enunciado, maxLength: 1000)) {
-        throw Exception('Enunciado da questão inválido');
+      // Validação do enunciado
+      if (!_securityService.validateText(
+        newQuestion.questionText,
+        maxLength: 1000,
+      )) {
+        throw ValidationException(ErrorMessages.invalidQuestionText);
       }
 
-      // Validar explicação se fornecida
-      if (explicacao != null && explicacao.isNotEmpty) {
-        if (!_securityService.validarTexto(explicacao, maxLength: 1000)) {
-          throw Exception('Explicação da questão inválida');
-        }
-      }
-
-      // Validar opções
-      if (opcoes.length < 2) {
-        throw Exception('Questão deve ter pelo menos 2 opções');
-      }
-
-      if (opcoes.length > 10) {
-        throw Exception('Questão não pode ter mais de 10 opções');
-      }
-
-      // Validar texto das opções
-      for (var opcao in opcoes.values) {
-        if (!_securityService.validarTexto(opcao['texto'], maxLength: 500)) {
-          throw Exception('Texto da opção inválido');
-        }
-      }
-
-      // Verificar se pelo menos uma opção está marcada como correta
-      bool temOpcaoCorreta = false;
-      for (var opcao in opcoes.values) {
-        if (opcao['correta'] == true) {
-          temOpcaoCorreta = true;
-          break;
-        }
-      }
-      if (!temOpcaoCorreta) {
-        throw Exception('Pelo menos uma opção deve estar marcada como correta');
+      // Validação da explicação (opcional)
+      if (newQuestion.explanation != null &&
+          !_securityService.validateText(
+            newQuestion.explanation,
+            maxLength: 1000,
+          )) {
+        throw ValidationException(ErrorMessages.invalidQuestionText);
       }
 
       // Verificar se a disciplina existe
-      final disciplinaSnapshot = await _database
-          .ref('disciplinas/$disciplinaId')
+      final subjectSnapshot = await _subjectsRef
+          .child(newQuestion.subjectId)
           .get();
-      if (!disciplinaSnapshot.exists) {
-        throw Exception('Disciplina não encontrada');
+      if (!subjectSnapshot.exists) {
+        throw NotFoundException(ErrorMessages.subjectNotFound);
       }
 
-      final enunciadoSanitizado = _securityService.sanitizarEntrada(enunciado);
-      final questaoRef = _database.ref('questoes').push();
-      final questaoId = questaoRef.key!;
+      // Verificar se o conteúdo existe
+      final contentSnapshot = await _contentsRef
+          .child(newQuestion.contentId)
+          .get();
+      if (!contentSnapshot.exists) {
+        throw NotFoundException(ErrorMessages.contentNotFound);
+      }
 
-      // Sanitizar opções
-      Map<String, Map<String, dynamic>> opcoesSanitizadas = {};
-      for (var entry in opcoes.entries) {
-        final texto = entry.value['texto'] as String?;
-        if (texto != null && texto.isNotEmpty) {
-          opcoesSanitizadas[entry.key] = {
-            'texto': _securityService.sanitizarEntrada(texto),
-            'correta': entry.value['correta'],
-            'ordem': entry.value['ordem'] ?? 1,
-          };
+      // Validar estrutura da questão
+      _validateQuestion(newQuestion);
+
+      // Criar questão
+      final newQuestionRef = _questionsRef.push();
+      await newQuestionRef.set(newQuestion.toJson());
+
+      await _securityService.logSecurityActivity(
+        'create_question',
+        'Question created: ${newQuestionRef.key}',
+        success: true,
+      );
+
+      return newQuestionRef.key!;
+    } on AppException {
+      rethrow;
+    } on FirebaseException catch (e) {
+      await _securityService.logSecurityActivity(
+        'error_create_question',
+        'Firebase database error: ${e.message}',
+        success: false,
+      );
+      throw NetworkException(
+        ErrorMessages.networkError,
+        originalError: e,
+      );
+    } catch (e) {
+      await _securityService.logSecurityActivity(
+        'error_create_question',
+        'Unexpected error: ${e.toString()}',
+        success: false,
+      );
+      throw UnexpectedException(
+        ErrorMessages.unexpectedError,
+        originalError: e,
+      );
+    }
+  }
+
+  /// Retorna stream de todas as questões ATIVAS
+  /// 
+  /// Otimizado: Filtra apenas questões ativas para melhor performance
+  Stream<List<Question>> getQuestionsStream() {
+    // Query otimizada: apenas questões ativas, ordenadas por data de criação
+    final query = _questionsRef
+        .orderByChild('isActive')
+        .equalTo(true);
+
+    return query.onValue.map((event) {
+      final questionsList = <Question>[];
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        for (final childSnapshot in event.snapshot.children) {
+          try {
+            questionsList.add(Question.fromSnapshot(childSnapshot));
+          } catch (e) {
+            // Ignora questões com dados inválidos, mas continua processando
+            continue;
+          }
         }
       }
-
-      await questaoRef.set({
-        'enunciado': enunciadoSanitizado,
-        'disciplinaId': disciplinaId,
-        'imagemUrl': imagemUrl,
-        'explicacao': explicacao != null
-            ? _securityService.sanitizarEntrada(explicacao)
-            : null,
-        'peso': peso ?? 1.0,
-        'dataCriacao': ServerValue.timestamp,
-        'criadoPor': user.uid,
-        'status': 'ativo',
-        'opcoes': opcoesSanitizadas,
-        'dificuldade': 'media', // padrão
-        'tags': [],
-        'versao': 1,
-      });
-
-      await _securityService.registrarAtividadeSeguranca(
-        'criar_questao',
-        'Questão criada: ${enunciadoSanitizado.length > 50 ? enunciadoSanitizado.substring(0, 50) + '...' : enunciadoSanitizado}',
-        sucesso: true,
+      return questionsList;
+    }).handleError((error) {
+      throw NetworkException(
+        ErrorMessages.fetchFailed,
+        originalError: error,
       );
+    });
+  }
 
-      return questaoId;
+  /// Retorna stream de TODAS as questões (ativas e inativas)
+  /// 
+  /// Use apenas quando necessário ver questões inativas
+  Stream<List<Question>> getAllQuestionsStream() {
+    return _questionsRef.onValue.map((event) {
+      final questionsList = <Question>[];
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        for (final childSnapshot in event.snapshot.children) {
+          try {
+            questionsList.add(Question.fromSnapshot(childSnapshot));
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+      return questionsList;
+    }).handleError((error) {
+      throw NetworkException(
+        ErrorMessages.fetchFailed,
+        originalError: error,
+      );
+    });
+  }
+
+  /// Retorna stream de questões de uma disciplina específica (apenas ativas)
+  /// 
+  /// Otimizado: Filtra por disciplina E status ativo
+  Stream<List<Question>> getQuestionsBySubjectStream(String subjectId) {
+    // Query otimizada: filtra por subjectId e isActive
+    // Nota: Firebase não suporta múltiplos orderByChild, então filtramos manualmente
+    final query = _questionsRef.orderByChild('subjectId').equalTo(subjectId);
+
+    return query.onValue.map((event) {
+      final questionsList = <Question>[];
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        for (final childSnapshot in event.snapshot.children) {
+          try {
+            final question = Question.fromSnapshot(childSnapshot);
+            // Filtro adicional: apenas questões ativas
+            if (question.isActive) {
+              questionsList.add(question);
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+      return questionsList;
+    }).handleError((error) {
+      throw NetworkException(
+        ErrorMessages.fetchFailed,
+        originalError: error,
+      );
+    });
+  }
+
+  /// Retorna stream de questões de um conteúdo específico (apenas ativas)
+  Stream<List<Question>> getQuestionsByContentStream(String contentId) {
+    final query = _questionsRef.orderByChild('contentId').equalTo(contentId);
+
+    return query.onValue.map((event) {
+      final questionsList = <Question>[];
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        for (final childSnapshot in event.snapshot.children) {
+          try {
+            final question = Question.fromSnapshot(childSnapshot);
+            // Filtro adicional: apenas questões ativas
+            if (question.isActive) {
+              questionsList.add(question);
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+      return questionsList;
+    }).handleError((error) {
+      throw NetworkException(
+        ErrorMessages.fetchFailed,
+        originalError: error,
+      );
+    });
+  }
+
+  /// Busca uma questão específica pelo ID
+  /// 
+  /// Retorna a questão ou lança [NotFoundException] se não encontrada
+  Future<Question> getQuestion(String questionId) async {
+    try {
+      final snapshot = await _questionsRef.child(questionId).get();
+      if (snapshot.exists) {
+        return Question.fromSnapshot(snapshot);
+      }
+      throw NotFoundException(ErrorMessages.questionNotFound);
+    } on AppException {
+      rethrow;
+    } on FirebaseException catch (e) {
+      throw NetworkException(
+        ErrorMessages.fetchFailed,
+        originalError: e,
+      );
     } catch (e) {
-      print('Erro ao criar questão: $e');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_criar_questao',
-        'Erro ao criar questão: $e',
-        sucesso: false,
+      throw UnexpectedException(
+        ErrorMessages.unexpectedError,
+        originalError: e,
       );
-      return null;
     }
   }
 
-  /// Lista todas as questões
-  Stream<DatabaseEvent> listarQuestoes() {
-    return _database.ref('questoes').onValue;
-  }
-
-  /// Busca questões por disciplina
-  Stream<DatabaseEvent> buscarQuestoesPorDisciplina(String disciplinaId) {
-    return _database
-        .ref('questoes')
-        .orderByChild('disciplinaId')
-        .equalTo(disciplinaId)
-        .onValue;
-  }
-
-  /// Busca uma questão específica
-  Future<DataSnapshot?> buscarQuestao(String questaoId) async {
-    try {
-      return await _database.ref('questoes/$questaoId').get();
-    } catch (e) {
-      print('Erro ao buscar questão: $e');
-      return null;
+  /// Atualiza uma questão existente
+  /// 
+  /// Exceções possíveis:
+  /// - [ValidationException]: Dados inválidos ou ID nulo
+  /// - [NotFoundException]: Questão, disciplina ou conteúdo não encontrado
+  /// - [AppFirebaseException]: Erro ao atualizar no Firebase
+  Future<void> updateQuestion(Question updatedQuestion) async {
+    if (updatedQuestion.id == null) {
+      throw ValidationException(ErrorMessages.questionIdRequired);
     }
-  }
 
-  /// Atualiza uma questão
-  Future<bool> atualizarQuestao(
-    String questaoId,
-    Map<String, dynamic> dados,
-  ) async {
     try {
-      // Sanitizar dados se necessário
-      if (dados.containsKey('enunciado') && dados['enunciado'] != null) {
-        dados['enunciado'] = _securityService.sanitizarEntrada(
-          dados['enunciado'],
-        );
-      }
-      if (dados.containsKey('explicacao') && dados['explicacao'] != null) {
-        dados['explicacao'] = _securityService.sanitizarEntrada(
-          dados['explicacao'],
-        );
+      // Validação do enunciado
+      if (!_securityService.validateText(
+        updatedQuestion.questionText,
+        maxLength: 1000,
+      )) {
+        throw ValidationException(ErrorMessages.invalidQuestionText);
       }
 
-      // Incrementar versão
-      dados['versao'] = ServerValue.increment(1);
-      dados['atualizadoEm'] = ServerValue.timestamp;
-      dados['atualizadoPor'] = _auth.currentUser?.uid;
+      // Validação da explicação (opcional)
+      if (updatedQuestion.explanation != null &&
+          !_securityService.validateText(
+            updatedQuestion.explanation,
+            maxLength: 1000,
+          )) {
+        throw ValidationException(ErrorMessages.invalidQuestionText);
+      }
 
-      await _database.ref('questoes/$questaoId').update(dados);
+      // Verificar se a questão existe
+      final questionSnapshot = await _questionsRef
+          .child(updatedQuestion.id!)
+          .get();
+      if (!questionSnapshot.exists) {
+        throw NotFoundException(ErrorMessages.questionNotFound);
+      }
 
-      await _securityService.registrarAtividadeSeguranca(
-        'atualizar_questao',
-        'Questão atualizada: $questaoId',
-        sucesso: true,
+      // Verificar se a disciplina existe
+      final subjectSnapshot = await _subjectsRef
+          .child(updatedQuestion.subjectId)
+          .get();
+      if (!subjectSnapshot.exists) {
+        throw NotFoundException(ErrorMessages.subjectNotFound);
+      }
+
+      // Verificar se o conteúdo existe
+      final contentSnapshot = await _contentsRef
+          .child(updatedQuestion.contentId)
+          .get();
+      if (!contentSnapshot.exists) {
+        throw NotFoundException(ErrorMessages.contentNotFound);
+      }
+
+      // Validar estrutura da questão
+      _validateQuestion(updatedQuestion);
+
+      // Atualizar questão
+      await _questionsRef
+          .child(updatedQuestion.id!)
+          .update(updatedQuestion.toJson());
+
+      await _securityService.logSecurityActivity(
+        'update_question',
+        'Question ${updatedQuestion.id} updated.',
+        success: true,
       );
-
-      return true;
+    } on AppException {
+      rethrow;
+    } on FirebaseException catch (e) {
+      await _securityService.logSecurityActivity(
+        'error_update_question',
+        'Firebase error: ${e.message}',
+        success: false,
+      );
+      throw NetworkException(
+        ErrorMessages.updateFailed,
+        originalError: e,
+      );
     } catch (e) {
-      print('Erro ao atualizar questão: $e');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_atualizar_questao',
-        'Erro ao atualizar questão: $e',
-        sucesso: false,
+      await _securityService.logSecurityActivity(
+        'error_update_question',
+        'Unexpected error: ${e.toString()}',
+        success: false,
       );
-      return false;
+      throw UnexpectedException(
+        ErrorMessages.unexpectedError,
+        originalError: e,
+      );
     }
   }
 
   /// Deleta uma questão
-  Future<bool> deletarQuestao(String questaoId) async {
+  /// 
+  /// Exceções possíveis:
+  /// - [NotFoundException]: Questão não encontrada
+  /// - [ResourceInUseException]: Questão está sendo usada em uma prova
+  /// - [AppFirebaseException]: Erro ao deletar no Firebase
+  /// 
+  /// Nota: A query original estava incorreta. Agora busca todas as provas
+  /// e verifica manualmente se a questão está em uso.
+  Future<void> deleteQuestion(String questionId) async {
     try {
-      // Verificar se a questão está sendo usada em algum exame
-      final examesSnapshot = await _database.ref('exames').get();
+      // Verificar se a questão existe
+      final questionSnapshot = await _questionsRef.child(questionId).get();
+      if (!questionSnapshot.exists) {
+        throw NotFoundException(ErrorMessages.questionNotFound);
+      }
 
-      if (examesSnapshot.exists) {
-        for (final child in examesSnapshot.children) {
-          final exame = child.value as Map<dynamic, dynamic>;
-          if (exame['questoes'] != null) {
-            final questoes = exame['questoes'] as Map<dynamic, dynamic>;
-            if (questoes.containsKey(questaoId)) {
-              throw Exception(
-                'Não é possível deletar questão que está sendo usada em exames',
-              );
+      // CORREÇÃO: Buscar todas as provas e verificar se a questão está em uso
+      // A query anterior (orderByChild('questions/$questionId')) não funciona
+      // porque Firebase não suporta orderByChild com paths aninhados assim
+      final examsSnapshot = await _examsRef.get();
+      
+      if (examsSnapshot.exists && examsSnapshot.value != null) {
+        final examsData = examsSnapshot.value as Map<dynamic, dynamic>;
+        
+        for (final examEntry in examsData.entries) {
+          final examData = examEntry.value as Map<dynamic, dynamic>;
+          final questions = examData['questions'];
+          
+          if (questions != null && questions is Map) {
+            // Verificar se a questão está na lista de questões da prova
+            if (questions.containsKey(questionId)) {
+              throw ResourceInUseException(ErrorMessages.questionInUse);
             }
           }
         }
       }
 
-      await _database.ref('questoes/$questaoId').remove();
+      // Se não está em uso, deletar
+      await _questionsRef.child(questionId).remove();
 
-      await _securityService.registrarAtividadeSeguranca(
-        'deletar_questao',
-        'Questão deletada: $questaoId',
-        sucesso: true,
+      await _securityService.logSecurityActivity(
+        'delete_question',
+        'Question $questionId deleted.',
+        success: true,
       );
-
-      return true;
+    } on AppException {
+      rethrow;
+    } on FirebaseException catch (e) {
+      await _securityService.logSecurityActivity(
+        'error_delete_question',
+        'Firebase error: ${e.message}',
+        success: false,
+      );
+      throw NetworkException(
+        ErrorMessages.deleteFailed,
+        originalError: e,
+      );
     } catch (e) {
-      print('Erro ao deletar questão: $e');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_deletar_questao',
-        'Erro ao deletar questão: $e',
-        sucesso: false,
+      await _securityService.logSecurityActivity(
+        'error_delete_question',
+        'Unexpected error: ${e.toString()}',
+        success: false,
       );
-      return false;
+      throw UnexpectedException(
+        ErrorMessages.unexpectedError,
+        originalError: e,
+      );
     }
   }
 
-  /// Busca questões por dificuldade
-  Stream<DatabaseEvent> buscarQuestoesPorDificuldade(String dificuldade) {
-    return _database
-        .ref('questoes')
-        .orderByChild('dificuldade')
-        .equalTo(dificuldade)
-        .onValue;
-  }
-
-  /// Busca questões por tags
-  Stream<DatabaseEvent> buscarQuestoesPorTag(String tag) {
-    // Como tags é um array, vamos buscar todas as questões e filtrar no cliente
-    return _database.ref('questoes').onValue;
-  }
-
-  /// Lista questões por status
-  Stream<DatabaseEvent> listarQuestoesPorStatus(String status) {
-    return _database
-        .ref('questoes')
-        .orderByChild('status')
-        .equalTo(status)
-        .onValue;
-  }
-
-  /// Ativa/desativa uma questão
-  Future<bool> alterarStatusQuestao(String questaoId, String status) async {
+  /// Ativa ou desativa uma questão
+  /// 
+  /// Exceções possíveis:
+  /// - [NotFoundException]: Questão não encontrada
+  /// - [AppFirebaseException]: Erro ao atualizar no Firebase
+  Future<void> toggleQuestionActive(String questionId, bool isActive) async {
     try {
-      if (status != 'ativo' && status != 'inativo') {
-        throw Exception('Status deve ser "ativo" ou "inativo"');
+      // Verificar se a questão existe
+      final questionSnapshot = await _questionsRef.child(questionId).get();
+      if (!questionSnapshot.exists) {
+        throw NotFoundException(ErrorMessages.questionNotFound);
       }
 
-      await _database.ref('questoes/$questaoId').update({
-        'status': status,
-        'alteradoEm': ServerValue.timestamp,
-        'alteradoPor': _auth.currentUser?.uid,
-      });
+      await _questionsRef.child(questionId).update({'isActive': isActive});
 
-      await _securityService.registrarAtividadeSeguranca(
-        'alterar_status_questao',
-        'Status da questão $questaoId alterado para $status',
-        sucesso: true,
+      await _securityService.logSecurityActivity(
+        'toggle_question_active',
+        'Question $questionId set to ${isActive ? "active" : "inactive"}.',
+        success: true,
       );
-
-      return true;
+    } on AppException {
+      rethrow;
+    } on FirebaseException catch (e) {
+      await _securityService.logSecurityActivity(
+        'error_toggle_question_active',
+        'Firebase error: ${e.message}',
+        success: false,
+      );
+      throw NetworkException(
+        ErrorMessages.updateFailed,
+        originalError: e,
+      );
     } catch (e) {
-      print('Erro ao alterar status da questão: $e');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_alterar_status_questao',
-        'Erro ao alterar status da questão: $e',
-        sucesso: false,
+      await _securityService.logSecurityActivity(
+        'error_toggle_question_active',
+        'Unexpected error: ${e.toString()}',
+        success: false,
       );
-      return false;
-    }
-  }
-
-  /// Adiciona tags a uma questão
-  Future<bool> adicionarTagsQuestao(String questaoId, List<String> tags) async {
-    try {
-      // Sanitizar tags
-      final tagsSanitizadas = tags
-          .map((tag) => _securityService.sanitizarEntrada(tag))
-          .where((tag) => tag.isNotEmpty)
-          .toList();
-
-      await _database.ref('questoes/$questaoId').update({
-        'tags': tagsSanitizadas,
-        'atualizadoEm': ServerValue.timestamp,
-        'atualizadoPor': _auth.currentUser?.uid,
-      });
-
-      await _securityService.registrarAtividadeSeguranca(
-        'adicionar_tags_questao',
-        'Tags adicionadas à questão $questaoId: ${tagsSanitizadas.join(', ')}',
-        sucesso: true,
+      throw UnexpectedException(
+        ErrorMessages.unexpectedError,
+        originalError: e,
       );
-
-      return true;
-    } catch (e) {
-      print('Erro ao adicionar tags à questão: $e');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_adicionar_tags_questao',
-        'Erro ao adicionar tags à questão: $e',
-        sucesso: false,
-      );
-      return false;
-    }
-  }
-
-  /// Conta questões por disciplina
-  Future<int> contarQuestoesPorDisciplina(String disciplinaId) async {
-    try {
-      final snapshot = await _database
-          .ref('questoes')
-          .orderByChild('disciplinaId')
-          .equalTo(disciplinaId)
-          .get();
-
-      return snapshot.children.length;
-    } catch (e) {
-      print('Erro ao contar questões da disciplina: $e');
-      return 0;
-    }
-  }
-
-  /// Busca questões por texto (busca parcial no enunciado)
-  Stream<DatabaseEvent> buscarQuestoesPorTexto(String texto) {
-    final textoSanitizado = _securityService.sanitizarEntrada(texto);
-    return _database
-        .ref('questoes')
-        .orderByChild('enunciado')
-        .startAt(textoSanitizado)
-        .endAt('$textoSanitizado\uf8ff')
-        .onValue;
-  }
-
-  /// Duplica uma questão
-  Future<String?> duplicarQuestao(String questaoId) async {
-    try {
-      final questaoSnapshot = await _database.ref('questoes/$questaoId').get();
-      if (!questaoSnapshot.exists) {
-        throw Exception('Questão não encontrada');
-      }
-
-      final questaoData = questaoSnapshot.value as Map<dynamic, dynamic>;
-
-      // Criar nova questão com dados modificados
-      final novaQuestaoRef = _database.ref('questoes').push();
-      final novaQuestaoId = novaQuestaoRef.key!;
-
-      // Remover campos que não devem ser duplicados
-      questaoData.remove('dataCriacao');
-      questaoData.remove('criadoPor');
-      questaoData.remove('versao');
-
-      // Adicionar novos campos
-      questaoData['enunciado'] = '${questaoData['enunciado']} (Cópia)';
-      questaoData['dataCriacao'] = ServerValue.timestamp;
-      questaoData['criadoPor'] = _auth.currentUser?.uid;
-      questaoData['versao'] = 1;
-      questaoData['status'] = 'ativo';
-
-      await novaQuestaoRef.set(questaoData);
-
-      await _securityService.registrarAtividadeSeguranca(
-        'duplicar_questao',
-        'Questão $questaoId duplicada como $novaQuestaoId',
-        sucesso: true,
-      );
-
-      return novaQuestaoId;
-    } catch (e) {
-      print('Erro ao duplicar questão: $e');
-      await _securityService.registrarAtividadeSeguranca(
-        'erro_duplicar_questao',
-        'Erro ao duplicar questão: $e',
-        sucesso: false,
-      );
-      return null;
     }
   }
 }
