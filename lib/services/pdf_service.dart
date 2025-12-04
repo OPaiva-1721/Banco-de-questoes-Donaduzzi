@@ -55,6 +55,10 @@ class PdfService {
           ),
           _buildInstructions(prova),
           _buildQuestions(prova, questoesCompletas),
+          // O gabarito é um único widget (Column). O motor do pdf
+          // vai tentar colocá‑lo na página atual; se não couber,
+          // ele automaticamente move o bloco inteiro para a próxima,
+          // sem quebrar no meio.
           _buildAnswerKey(prova, questoesCompletas),
         ],
       ),
@@ -195,72 +199,124 @@ class PdfService {
     }
     final List<String> letrasOrdenadas = todasLetras.toList()..sort();
 
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(top: 40),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Divider(thickness: 2),
-          pw.SizedBox(height: 20),
-          pw.Text(
-            'GABARITO',
-            style: pw.TextStyle(
-              fontSize: 18,
-              fontWeight: pw.FontWeight.bold,
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        pw.Divider(thickness: 1),
+        pw.SizedBox(height: 8),
+        pw.Text(
+          'GABARITO',
+          style: pw.TextStyle(
+            fontSize: 14,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+        pw.SizedBox(height: 6),
+        pw.Text(
+          'Marque suas respostas preenchendo completamente o círculo correspondente:',
+          style: pw.TextStyle(fontSize: 11),
+        ),
+        pw.SizedBox(height: 8),
+        pw.Container(
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(
+              color: PdfColors.grey300,
+              width: 0.8,
             ),
           ),
-          pw.SizedBox(height: 12),
-          pw.Text(
-            'Marque suas respostas preenchendo completamente o círculo correspondente:',
-            style: pw.TextStyle(fontSize: 11),
-          ),
-          pw.SizedBox(height: 16),
-          // Container com borda tracejada apenas ao redor da tabela
-          pw.Container(
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(
-                color: PdfColors.black,
-                width: 2.5,
-              ),
+          padding: const pw.EdgeInsets.all(4),
+          child: pw.Table(
+            border: pw.TableBorder(
+              top: const pw.BorderSide(color: PdfColors.grey300, width: 0.4),
+              bottom: const pw.BorderSide(color: PdfColors.grey300, width: 0.4),
+              left: const pw.BorderSide(color: PdfColors.grey300, width: 0.4),
+              right: const pw.BorderSide(color: PdfColors.grey300, width: 0.4),
+              horizontalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.4),
+              verticalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.4),
             ),
-            padding: const pw.EdgeInsets.all(2),
-            child: pw.Table(
-              border: pw.TableBorder(
-                top: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                bottom: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                left: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                right: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                horizontalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
-                verticalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.5),
+              ...Map.fromIterable(
+                List.generate(letrasOrdenadas.length, (i) => i + 1),
+                key: (i) => i,
+                value: (_) => const pw.FlexColumnWidth(1),
               ),
-              columnWidths: {
-                0: const pw.FlexColumnWidth(1.5),
-                ...Map.fromIterable(
-                  List.generate(letrasOrdenadas.length, (i) => i + 1),
-                  key: (i) => i,
-                  value: (_) => const pw.FlexColumnWidth(1),
-                ),
-              },
-              children: [
-                // Cabeçalho da tabela - VERSÃO SIMPLIFICADA
-                pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+            },
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                children: [
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border(
+                        right: const pw.BorderSide(
+                          color: PdfColors.grey400,
+                          width: 0.8,
+                        ),
+                      ),
+                    ),
+                    child: pw.Center(
+                      child: pw.Text(
+                        'Questão',
+                        style: pw.TextStyle(
+                          fontSize: 11,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ...letrasOrdenadas.map(
+                    (letra) => pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border(
+                          right: letra == letrasOrdenadas.last
+                              ? const pw.BorderSide(
+                                  color: PdfColors.grey400,
+                                  width: 0.8,
+                                )
+                              : const pw.BorderSide(
+                                  color: PdfColors.grey300,
+                                  width: 0.6,
+                                ),
+                        ),
+                      ),
+                      child: pw.Center(
+                        child: pw.Text(
+                          letra,
+                          style: pw.TextStyle(
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              ...questoesCompletas.asMap().entries.map((entry) {
+                final questao = entry.value;
+                final numeroQuestao = numerosMap[questao.id] ?? (entry.key + 1);
+
+                return pw.TableRow(
                   children: [
                     pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                       decoration: pw.BoxDecoration(
                         border: pw.Border(
                           right: const pw.BorderSide(
-                            color: PdfColors.black,
-                            width: 2.0,
+                            color: PdfColors.grey400,
+                            width: 0.8,
                           ),
                         ),
                       ),
                       child: pw.Center(
                         child: pw.Text(
-                          'Questão',
+                          '$numeroQuestao',
                           style: pw.TextStyle(
-                            fontSize: 13,
+                            fontSize: 11,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
@@ -268,103 +324,43 @@ class PdfService {
                     ),
                     ...letrasOrdenadas.map(
                       (letra) => pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 6),
                         decoration: pw.BoxDecoration(
                           border: pw.Border(
                             right: letra == letrasOrdenadas.last
                                 ? const pw.BorderSide(
-                                    color: PdfColors.black,
-                                    width: 2.0,
+                                    color: PdfColors.grey400,
+                                    width: 0.8,
                                   )
                                 : const pw.BorderSide(
-                                    color: PdfColors.grey400,
-                                    width: 1.0,
+                                    color: PdfColors.grey300,
+                                    width: 0.6,
                                   ),
                           ),
                         ),
                         child: pw.Center(
-                          child: pw.Text(
-                            letra,
-                            style: pw.TextStyle(
-                              fontSize: 13,
-                              fontWeight: pw.FontWeight.bold,
+                          child: pw.Container(
+                            width: 14,
+                            height: 14,
+                            decoration: pw.BoxDecoration(
+                              shape: pw.BoxShape.circle,
+                              border: pw.Border.all(
+                                color: PdfColors.black,
+                                width: 1.2,
+                              ),
+                              color: PdfColors.white,
                             ),
                           ),
                         ),
                       ),
                     ),
                   ],
-                ),
-                // Linhas das questões - VERSÃO SIMPLIFICADA E ROBUSTA
-                ...questoesCompletas.asMap().entries.map((entry) {
-                  final questao = entry.value;
-                  final numeroQuestao = numerosMap[questao.id] ?? (entry.key + 1);
-
-                  return pw.TableRow(
-                    children: [
-                      // Coluna "Questão"
-                      pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                        decoration: pw.BoxDecoration(
-                          border: pw.Border(
-                            right: const pw.BorderSide(
-                              color: PdfColors.black,
-                              width: 2.0,
-                            ),
-                          ),
-                        ),
-                        child: pw.Center(
-                          child: pw.Text(
-                            '$numeroQuestao',
-                            style: pw.TextStyle(
-                              fontSize: 14,
-                              fontWeight: pw.FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Colunas das alternativas
-                      ...letrasOrdenadas.map(
-                        (letra) => pw.Container(
-                          padding: const pw.EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-                          decoration: pw.BoxDecoration(
-                            border: pw.Border(
-                              right: letra == letrasOrdenadas.last
-                                  ? const pw.BorderSide(
-                                      color: PdfColors.black,
-                                      width: 2.0,
-                                    )
-                                  : const pw.BorderSide(
-                                      color: PdfColors.grey400,
-                                      width: 1.0,
-                                    ),
-                            ),
-                          ),
-                          child: pw.Center(
-                            child: pw.Container(
-                              width: 24,  // Círculo maior: 24x24
-                              height: 24,  // Círculo maior: 24x24
-                              decoration: pw.BoxDecoration(
-                                shape: pw.BoxShape.circle,
-                                border: pw.Border.all(
-                                  color: PdfColors.black,
-                                  width: 2.5,  // Borda mais grossa: 2.5
-                                ),
-                                color: PdfColors.white,  // Fundo branco para contraste
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                }),
-              ],
-            ),
+                );
+              }),
+            ],
           ),
-          pw.SizedBox(height: 20),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

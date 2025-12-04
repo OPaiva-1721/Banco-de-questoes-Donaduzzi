@@ -172,7 +172,7 @@ IMPORTANTE:
           }
         });
         
-        print('⚠️ ATENÇÃO: Questões com múltiplas respostas detectadas (serão consideradas erradas):');
+        print('! ATENÇÃO: Questões com múltiplas respostas detectadas (serão consideradas erradas):');
         for (var questao in questoesInvalidas) {
           print('  - $questao');
         }
