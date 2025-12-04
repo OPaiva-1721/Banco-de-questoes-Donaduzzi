@@ -165,7 +165,7 @@ IMPORTANTE:
         final List<String> questoesInvalidas = [];
         invalidasMap.forEach((key, value) {
           if (value is List) {
-            final alternativas = (value as List).map((e) => e.toString()).join(', ');
+            final alternativas = (value).map((e) => e.toString()).join(', ');
             questoesInvalidas.add('Questão $key: ${alternativas}');
           } else {
             questoesInvalidas.add('Questão $key: múltiplas respostas');

@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:prova/screens/professor/banco_questoes/banco_questoes_menu_screen.dart';
-import 'package:prova/screens/professor/conteudo/gerenciar_conteudos_screen.dart';
 import '../../utils/message_utils.dart';
 import '../../services/firebase_service.dart';
-import '../../services/permission_service.dart';
+import '../../core/app_colors.dart'; // Mantido da sua branch visual
+import '../../services/permission_service.dart'; // Mantido da main
 import '../auth/tela_login.dart';
 import '../professor/criar_prova/criar_prova_screen.dart';
+import '../professor/banco_questoes/banco_questoes_menu_screen.dart';
 import '../professor/provas_geradas_screen.dart';
-import '../professor/disciplinas/gerenciar_disciplinas_screen.dart';
-import '../professor/cursos/gerenciar_cursos_screen.dart';
 import '../professor/corrigir_prova/corrigir_prova_screen.dart';
+import '../professor/disciplinas/gerenciar_disciplinas_screen.dart';
+import '../professor/conteudo/gerenciar_conteudos_screen.dart';
+import '../professor/cursos/gerenciar_cursos_screen.dart';
 
 class TelaInicio extends StatefulWidget {
   const TelaInicio({super.key});
@@ -20,11 +21,6 @@ class TelaInicio extends StatefulWidget {
 
 class _TelaInicioState extends State<TelaInicio> {
   static final FirebaseService _firebaseService = FirebaseService();
-
-  static const Color _primaryColor = Color(0xFF541822);
-  static const Color _backgroundColor = Color(0xFFF5F5F5);
-  static const Color _textColor = Color(0xFF333333);
-  static const Color _textSecondaryColor = Colors.black54;
 
   @override
   void initState() {
@@ -48,341 +44,213 @@ class _TelaInicioState extends State<TelaInicio> {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final isMobile = screenSize.width < 768;
-    final isTablet = screenSize.width >= 768 && screenSize.width < 1024;
+    final user = _firebaseService.currentUser;
+    // Pega as iniciais do usuário ou usa padrão
+    final userInitials = user?.displayName?.isNotEmpty == true
+        ? user!.displayName!.substring(0, 2).toUpperCase()
+        : "PF";
 
     return Scaffold(
-      backgroundColor: _backgroundColor,
-      body: Column(
-        children: [
-          _buildHeader(context, isMobile, isTablet),
-
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16.0 : 24.0,
-                vertical: 24.0,
-              ),
-              child: Column(
-                children: [
-                  _buildTitle(isMobile, isTablet),
-
-                  const SizedBox(height: 32),
-
-                  _buildCardsGrid(context, isMobile, isTablet),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context, bool isMobile, bool isTablet) {
-    final headerHeight = isMobile ? 100.0 : (isTablet ? 110.0 : 120.0);
-    final logoSize = isMobile ? 140.0 : (isTablet ? 150.0 : 160.0);
-    final logoHeight = isMobile ? 50.0 : (isTablet ? 55.0 : 60.0);
-
-    return Container(
-      width: double.infinity,
-      height: headerHeight,
-      decoration: BoxDecoration(
-        color: _primaryColor,
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black26,
-            offset: Offset(0, 4),
-            blurRadius: 4,
-            spreadRadius: 3,
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Center(
-            child: Image.asset(
-              'assets/images/logo.png',
-              width: logoSize,
-              height: logoHeight,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  width: logoSize,
-                  height: logoHeight,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'LOGO',
-                      style: TextStyle(
-                        fontSize: isMobile ? 16 : 18,
-                        fontWeight: FontWeight.bold,
-                        color: _primaryColor,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Positioned(
-            right: 16,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: IconButton(
-                onPressed: () => _fazerLogout(context),
-                icon: const Icon(Icons.logout, color: Colors.white, size: 28),
-                tooltip: 'Sair',
-                style: IconButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  shape: const CircleBorder(),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        toolbarHeight: 80,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: Colors.white24,
+              child: Text(
+                userInitials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTitle(bool isMobile, bool isTablet) {
-    return Text(
-      "Painel do Professor",
-      style: TextStyle(
-        fontFamily: "Inter",
-        fontSize: isMobile ? 24 : 30,
-        fontWeight: FontWeight.bold,
-        color: _textColor,
-      ),
-    );
-  }
-
-  Widget _buildCardsGrid(BuildContext context, bool isMobile, bool isTablet) {
-    final cards = [
-      _CardData(
-        title: "Criar nova prova",
-        subtitle: "Crie uma nova prova selecionando questões do banco.",
-        icon: Icons.add,
-        onTap: () => _navegarParaCriarProva(context),
-      ),
-      _CardData(
-        title: "Banco de questões",
-        subtitle: "Adicione, edite ou visualize as questões existentes.",
-        icon: Icons.list_alt,
-        onTap: () => _navegarParaBancoQuestoes(context),
-      ),
-      _CardData(
-        title: "Provas geradas",
-        subtitle: "Histórico de provas geradas.",
-        icon: Icons.history,
-        onTap: () => _navegarParaProvasGeradas(context),
-      ),
-      _CardData(
-        title: "Corrigir prova",
-        subtitle: "Corrija provas automaticamente usando a câmera.",
-        icon: Icons.camera_alt,
-        onTap: () => _navegarParaCorrigirProva(context),
-      ),
-      _CardData(
-        title: "Gerenciar Disciplinas",
-        subtitle: "Adicione, edite ou gerencie as disciplinas do sistema.",
-        icon: Icons.school,
-        onTap: () => _navegarParaDisciplinas(context),
-      ),
-      _CardData(
-        title: "Criar novo conteudo",
-        subtitle: "Crie um novo conteúdo selecionando questões do banco.",
-        icon: Icons.add,
-        onTap: () => _navegarParaCriarConteudo(context),
-      ),
-      _CardData(
-        title: "Gerenciar Cursos",
-        subtitle: "Adicione, edite ou gerencie os cursos do sistema.",
-        icon: Icons.school_outlined,
-        onTap: () => _navegarParaCursos(context),
-      ),
-    ];
-
-    return Column(
-      children: cards
-          .map(
-            (card) => Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: _buildCard(context, card, isMobile, isTablet),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  Widget _buildCard(
-    BuildContext context,
-    _CardData cardData,
-    bool isMobile,
-    bool isTablet,
-  ) {
-    final cardHeight = isMobile ? 120.0 : (isTablet ? 130.0 : 134.0);
-    final iconSize = isMobile ? 25.0 : (isTablet ? 28.0 : 30.0);
-    final iconRadius = isMobile ? 25.0 : (isTablet ? 28.0 : 33.0);
-    final titleFontSize = isMobile ? 18.0 : (isTablet ? 20.0 : 22.0);
-    final subtitleFontSize = isMobile ? 13.0 : (isTablet ? 14.0 : 15.0);
-
-    return Semantics(
-      label: cardData.title,
-      hint: cardData.subtitle,
-      button: true,
-      child: GestureDetector(
-        onTap: cardData.onTap,
-        child: Container(
-          width: double.infinity,
-          height: cardHeight,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                offset: Offset(0, 2),
-                blurRadius: 8,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 20,
-              vertical: isMobile ? 16 : 20,
-            ),
-            child: Row(
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: iconRadius,
-                  backgroundColor: _primaryColor,
-                  child: Icon(
-                    cardData.icon,
+                const Text(
+                  "Olá, Professor",
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                Text(
+                  user?.displayName ?? "Bem-vindo",
+                  style: const TextStyle(
                     color: Colors.white,
-                    size: iconSize,
-                    semanticLabel: cardData.title,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                ),
-                SizedBox(width: isMobile ? 16 : 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        cardData.title,
-                        style: TextStyle(
-                          fontSize: titleFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: _textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        cardData.subtitle,
-                        style: TextStyle(
-                          fontSize: subtitleFontSize,
-                          color: _textSecondaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: _textSecondaryColor,
                 ),
               ],
             ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: () => _fazerLogout(context),
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
           ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+        ),
+        child: Column(
+          children: [
+            // Container decorativo no topo para dar acabamento profissional
+            Container(
+              height: 20,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(24),
+                  bottomRight: Radius.circular(24),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: GridView.count(
+                  crossAxisCount: 2, // 2 Colunas
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 1.1, // Controla altura dos cards
+                  children: [
+                    _DashboardCard(
+                      title: "Criar Prova",
+                      icon: Icons.note_add_outlined,
+                      color: Colors.blue.shade700,
+                      onTap: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const CriarProvaScreen())),
+                    ),
+                    _DashboardCard(
+                      title: "Banco de Questões",
+                      icon: Icons.storage_rounded,
+                      color: Colors.orange.shade700,
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const GerenciarQuestoesScreen())),
+                    ),
+                    _DashboardCard(
+                      title: "Provas Geradas",
+                      icon: Icons.history_edu_rounded,
+                      color: Colors.purple.shade700,
+                      onTap: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const ProvasGeradasScreen())),
+                    ),
+                    _DashboardCard(
+                      title: "Corrigir Prova",
+                      icon: Icons.document_scanner_rounded,
+                      color: Colors.teal.shade700,
+                      onTap: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const CorrigirProvaScreen())),
+                    ),
+                    _DashboardCard(
+                      title: "Disciplinas",
+                      icon: Icons.book_outlined,
+                      color: Colors.indigo.shade700,
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const GerenciarDisciplinasScreen())),
+                    ),
+                    _DashboardCard(
+                      title: "Conteúdos",
+                      icon: Icons.library_books_outlined,
+                      color: Colors.pink.shade700,
+                      onTap: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const GerenciarConteudosScreen())),
+                    ),
+                    _DashboardCard(
+                      title: "Cursos",
+                      icon: Icons.school_outlined,
+                      color: Colors.brown.shade700,
+                      onTap: () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => const GerenciarCursosScreen())),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  void _navegarParaCriarProva(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const CriarProvaScreen()),
-    );
-  }
-
-  void _navegarParaBancoQuestoes(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const GerenciarQuestoesScreen()),
-    );
-  }
-
-  void _navegarParaProvasGeradas(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
-    );
-  }
-
-  void _navegarParaCorrigirProva(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const CorrigirProvaScreen()),
-    );
-  }
-
-  void _navegarParaDisciplinas(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const GerenciarDisciplinasScreen(),
-      ),
-    );
-  }
-
-  void _navegarParaCriarConteudo(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const GerenciarConteudosScreen()),
-    );
-  }
-
-  void _navegarParaCursos(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const GerenciarCursosScreen()),
     );
   }
 
   Future<void> _fazerLogout(BuildContext context) async {
     try {
       await _firebaseService.signOut();
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const TelaLogin()),
-        (route) => false,
-      );
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const TelaLogin()),
+          (route) => false,
+        );
+      }
     } catch (e) {
-      MessageUtils.mostrarErroFormatado(context, e);
+      if (mounted) {
+        MessageUtils.mostrarErroFormatado(context, e);
+      }
     }
   }
 }
 
-class _CardData {
+// Widget auxiliar para os Cards do Dashboard
+class _DashboardCard extends StatelessWidget {
   final String title;
-  final String subtitle;
   final IconData icon;
+  final Color color;
   final VoidCallback onTap;
 
-  _CardData({
+  const _DashboardCard({
     required this.title,
-    required this.subtitle,
     required this.icon,
+    required this.color,
     required this.onTap,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shadowColor: Colors.black12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 32, color: color),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

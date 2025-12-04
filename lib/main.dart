@@ -5,19 +5,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'screens/auth/tela_login.dart';
 import 'screens/home/pagina_principal.dart';
+import 'core/app_colors.dart'; // Importando suas cores
 
-/// Ponto de entrada principal da aplicação
 void main() async {
-  // Garante que o Flutter está pronto
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Carregar variáveis de ambiente do arquivo .env
   try {
     await dotenv.load(fileName: ".env");
-    print('Variáveis de ambiente carregadas com sucesso');
   } catch (e) {
-    print('Aviso: Arquivo .env não encontrado ou erro ao carregar: $e');
-    print('Você pode criar um arquivo .env na raiz do projeto com GEMINI_API_KEY=sua-chave');
+    print('Aviso: Arquivo .env não encontrado: $e');
   }
 
   try {
@@ -25,9 +21,6 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print('Firebase inicializado com sucesso');
-    } else {
-      print('Firebase já inicializado');
     }
   } catch (e) {
     print('Erro ao inicializar Firebase: $e');
@@ -36,7 +29,6 @@ void main() async {
   runApp(const MyApp());
 }
 
-/// Widget principal da aplicação (Stateless)
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -44,17 +36,48 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sistema de Provas',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        // Define a cor semente para gerar toda a paleta harmoniosa
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          primary: AppColors.primary,
+          background: AppColors.background,
+          surface: Colors.white,
+        ),
+        // Estilo global dos Inputs
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.grey),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+        // Estilo global dos Botões
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+        ),
       ),
       home: const AuthWrapper(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-/// Widget que "ouve" o estado de autenticação do Firebase
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -65,43 +88,12 @@ class AuthWrapper extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Verificando autenticação...'),
-                ],
-              ),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
-
-        if (snapshot.hasError) {
-          print(
-            'AuthWrapper - Erro no stream de autenticação: ${snapshot.error}',
-          );
-          return const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error, size: 64, color: Colors.red),
-                  SizedBox(height: 16),
-                  Text('Erro na autenticação'),
-                ],
-              ),
-            ),
-          );
-        }
-
         if (snapshot.hasData && snapshot.data != null) {
-          final user = snapshot.data!;
-          print('AuthWrapper - Usuário logado: ${user.email} (${user.uid})');
           return const TelaInicio();
         } else {
-          print('AuthWrapper - Usuário não logado, mostrando TelaLogin');
           return const TelaLogin();
         }
       },
