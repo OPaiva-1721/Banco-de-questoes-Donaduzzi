@@ -203,6 +203,14 @@ lib/
   - Associação com disciplinas
   - Gerenciamento de semestres
 
+#### `permission_service.dart` - Permissões
+- **Função:** Gerencia solicitações de permissões em runtime
+- **Responsabilidades:**
+  - Solicitação de permissão de notificações (Android 13+)
+  - Solicitação de permissão de câmera
+  - Solicitação de permissão de acesso a imagens
+  - Verificação de status de permissões
+
 #### `security_service.dart` - Segurança
 - **Função:** Gerencia segurança e validações
 - **Responsabilidades:**
