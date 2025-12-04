@@ -216,10 +216,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
       try {
         await _questionService.deleteQuestion(questao.id!);
         if (mounted) {
-          MessageUtils.mostrarSucesso(
-            context,
-            'Questão apagada com sucesso!',
-          );
+          MessageUtils.mostrarSucesso(context, 'Questão apagada com sucesso!');
           await _carregarQuestoes();
         }
       } catch (e) {
@@ -312,6 +309,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   DropdownButtonFormField<String?>(
+                                    isExpanded: true,
                                     value: _disciplinaFiltro,
                                     decoration: InputDecoration(
                                       border: OutlineInputBorder(
@@ -362,6 +360,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   DropdownButtonFormField<String>(
+                                    isExpanded: true,
                                     value: _dificuldadeFiltro,
                                     decoration: InputDecoration(
                                       border: OutlineInputBorder(
