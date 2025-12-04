@@ -22,6 +22,7 @@ class PdfService {
 
     final font = await PdfGoogleFonts.robotoRegular();
     final fontBold = await PdfGoogleFonts.robotoBold();
+    final fontItalic = await PdfGoogleFonts.robotoItalic();
     final ByteData cabecalhoBytes = await rootBundle.load(
       'assets/images/cabecalho-prova.png',
     );
@@ -38,7 +39,11 @@ class PdfService {
 
     pdf.addPage(
       pw.MultiPage(
-        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
+        theme: pw.ThemeData.withFont(
+          base: font,
+          bold: fontBold,
+          italic: fontItalic,
+        ),
         pageFormat: PdfPageFormat.a4,
         build: (context) => [
           _buildHeader(
@@ -50,6 +55,7 @@ class PdfService {
           ),
           _buildInstructions(prova),
           _buildQuestions(prova, questoesCompletas),
+          _buildAnswerKey(prova, questoesCompletas),
         ],
       ),
     );
@@ -162,6 +168,202 @@ class PdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: widgets,
+      ),
+    );
+  }
+
+  static pw.Widget _buildAnswerKey(
+    Exam prova,
+    List<Question> questoesCompletas,
+  ) {
+    final Map<String, int> numerosMap = {
+      for (var link in prova.questions) link.questionId: link.order,
+    };
+
+    questoesCompletas.sort((a, b) {
+      final orderA = numerosMap[a.id] ?? 999;
+      final orderB = numerosMap[b.id] ?? 999;
+      return orderA.compareTo(orderB);
+    });
+
+    // Obter todas as letras disponíveis (normalmente A, B, C, D, E)
+    final Set<String> todasLetras = {};
+    for (var questao in questoesCompletas) {
+      for (var option in questao.options) {
+        todasLetras.add(option.letter.toUpperCase());
+      }
+    }
+    final List<String> letrasOrdenadas = todasLetras.toList()..sort();
+
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(top: 40),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Divider(thickness: 2),
+          pw.SizedBox(height: 20),
+          pw.Text(
+            'GABARITO',
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Marque suas respostas preenchendo completamente o círculo correspondente:',
+            style: pw.TextStyle(fontSize: 11),
+          ),
+          pw.SizedBox(height: 16),
+          // Container com borda tracejada apenas ao redor da tabela
+          pw.Container(
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(
+                color: PdfColors.black,
+                width: 2.5,
+              ),
+            ),
+            padding: const pw.EdgeInsets.all(2),
+            child: pw.Table(
+              border: pw.TableBorder(
+                top: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                bottom: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                left: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                right: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                horizontalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                verticalInside: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+              ),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(1.5),
+                ...Map.fromIterable(
+                  List.generate(letrasOrdenadas.length, (i) => i + 1),
+                  key: (i) => i,
+                  value: (_) => const pw.FlexColumnWidth(1),
+                ),
+              },
+              children: [
+                // Cabeçalho da tabela - VERSÃO SIMPLIFICADA
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border(
+                          right: const pw.BorderSide(
+                            color: PdfColors.black,
+                            width: 2.0,
+                          ),
+                        ),
+                      ),
+                      child: pw.Center(
+                        child: pw.Text(
+                          'Questão',
+                          style: pw.TextStyle(
+                            fontSize: 13,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    ...letrasOrdenadas.map(
+                      (letra) => pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border(
+                            right: letra == letrasOrdenadas.last
+                                ? const pw.BorderSide(
+                                    color: PdfColors.black,
+                                    width: 2.0,
+                                  )
+                                : const pw.BorderSide(
+                                    color: PdfColors.grey400,
+                                    width: 1.0,
+                                  ),
+                          ),
+                        ),
+                        child: pw.Center(
+                          child: pw.Text(
+                            letra,
+                            style: pw.TextStyle(
+                              fontSize: 13,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                // Linhas das questões - VERSÃO SIMPLIFICADA E ROBUSTA
+                ...questoesCompletas.asMap().entries.map((entry) {
+                  final questao = entry.value;
+                  final numeroQuestao = numerosMap[questao.id] ?? (entry.key + 1);
+
+                  return pw.TableRow(
+                    children: [
+                      // Coluna "Questão"
+                      pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border(
+                            right: const pw.BorderSide(
+                              color: PdfColors.black,
+                              width: 2.0,
+                            ),
+                          ),
+                        ),
+                        child: pw.Center(
+                          child: pw.Text(
+                            '$numeroQuestao',
+                            style: pw.TextStyle(
+                              fontSize: 14,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Colunas das alternativas
+                      ...letrasOrdenadas.map(
+                        (letra) => pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border(
+                              right: letra == letrasOrdenadas.last
+                                  ? const pw.BorderSide(
+                                      color: PdfColors.black,
+                                      width: 2.0,
+                                    )
+                                  : const pw.BorderSide(
+                                      color: PdfColors.grey400,
+                                      width: 1.0,
+                                    ),
+                            ),
+                          ),
+                          child: pw.Center(
+                            child: pw.Container(
+                              width: 24,  // Círculo maior: 24x24
+                              height: 24,  // Círculo maior: 24x24
+                              decoration: pw.BoxDecoration(
+                                shape: pw.BoxShape.circle,
+                                border: pw.Border.all(
+                                  color: PdfColors.black,
+                                  width: 2.5,  // Borda mais grossa: 2.5
+                                ),
+                                color: PdfColors.white,  // Fundo branco para contraste
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 20),
+        ],
       ),
     );
   }

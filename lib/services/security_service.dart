@@ -30,14 +30,22 @@ class SecurityService {
   }
 
   /// Logs a security activity to the Firebase database.
+  /// Only logs if user is authenticated to avoid permission errors.
   Future<void> logSecurityActivity(
     // registrarAtividadeSeguranca -> logSecurityActivity
     String action, // acao -> action
     String details, { // detalhes -> details
     bool success = true, // sucesso -> success
   }) async {
-    final userId =
-        _auth.currentUser?.uid ?? 'system'; // usuarioId, 'sistema' -> 'system'
+    // Only log if user is authenticated
+    // This prevents permission errors when user is not logged in
+    if (_auth.currentUser == null) {
+      // Silently skip logging when user is not authenticated
+      // This is expected behavior during login/initialization
+      return;
+    }
+
+    final userId = _auth.currentUser!.uid;
 
     try {
       final newLogRef = _logRef.push();
@@ -50,9 +58,14 @@ class SecurityService {
         'timestamp': ServerValue.timestamp,
       });
     } catch (e) {
-      // If writing the log fails, just print to console.
+      // If writing the log fails, just print to console in debug mode.
       // Don't stop the main application flow.
-      print('Error writing to security log: $e'); // Traduzido
+      // Only print if it's not a permission error (which is expected when not authenticated)
+      final errorString = e.toString();
+      if (!errorString.contains('permission-denied') && 
+          !errorString.contains('PERMISSION_DENIED')) {
+        print('Error writing to security log: $e');
+      }
     }
   }
 }

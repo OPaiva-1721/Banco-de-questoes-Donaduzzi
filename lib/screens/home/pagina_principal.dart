@@ -8,6 +8,7 @@ import '../professor/criar_prova/criar_prova_screen.dart';
 import '../professor/provas_geradas_screen.dart';
 import '../professor/disciplinas/gerenciar_disciplinas_screen.dart';
 import '../professor/cursos/gerenciar_cursos_screen.dart';
+import '../professor/corrigir_prova/corrigir_prova_screen.dart';
 
 class TelaInicio extends StatelessWidget {
   const TelaInicio({super.key});
@@ -156,6 +157,12 @@ class TelaInicio extends StatelessWidget {
         onTap: () => _navegarParaProvasGeradas(context),
       ),
       _CardData(
+        title: "Corrigir prova",
+        subtitle: "Corrija provas automaticamente usando a câmera.",
+        icon: Icons.camera_alt,
+        onTap: () => _navegarParaCorrigirProva(context),
+      ),
+      _CardData(
         title: "Gerenciar Disciplinas",
         subtitle: "Adicione, edite ou gerencie as disciplinas do sistema.",
         icon: Icons.school,
@@ -295,7 +302,13 @@ class TelaInicio extends StatelessWidget {
       MaterialPageRoute(builder: (context) => const ProvasGeradasScreen()),
     );
   }
-  
+
+  void _navegarParaCorrigirProva(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CorrigirProvaScreen()),
+    );
+  }
 
   void _navegarParaDisciplinas(BuildContext context) {
     Navigator.push(

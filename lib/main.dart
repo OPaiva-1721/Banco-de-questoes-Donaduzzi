@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'screens/auth/tela_login.dart';
 import 'screens/home/pagina_principal.dart';
@@ -9,6 +10,15 @@ import 'screens/home/pagina_principal.dart';
 void main() async {
   // Garante que o Flutter está pronto
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Carregar variáveis de ambiente do arquivo .env
+  try {
+    await dotenv.load(fileName: ".env");
+    print('Variáveis de ambiente carregadas com sucesso');
+  } catch (e) {
+    print('Aviso: Arquivo .env não encontrado ou erro ao carregar: $e');
+    print('Você pode criar um arquivo .env na raiz do projeto com GEMINI_API_KEY=sua-chave');
+  }
 
   try {
     if (Firebase.apps.isEmpty) {
