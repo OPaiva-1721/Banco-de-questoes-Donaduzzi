@@ -26,8 +26,10 @@ Um sistema completo de gerenciamento de provas desenvolvido em Flutter com Fireb
 - ✅ CRUD completo de disciplinas
 - ✅ CRUD completo de questões (múltipla escolha)
 - ✅ CRUD completo de provas
-- ✅ Sistema de cursos
+- ✅ CRUD completo de cursos
 - ✅ Banco de questões organizado por disciplina
+- ✅ Geração de provas em PDF
+- ✅ Correção automática de provas com OCR e IA
 
 ### 🎨 **Interface e UX**
 - ✅ Design responsivo e moderno
@@ -63,6 +65,7 @@ lib/
 │   ├── question_service.dart         # ❓ Gerenciamento de questões
 │   ├── exam_service.dart             # 📝 Gerenciamento de provas
 │   ├── course_service.dart           # 🎓 Gerenciamento de cursos
+│   ├── permission_service.dart       # 🔐 Gerenciamento de permissões
 │   └── security_service.dart         # 🛡️ Segurança e validações
 ├── utils/                             # 🛠️ Utilitários e helpers
 │   ├── auth_error_utils.dart         # ❌ Tratamento de erros de auth
@@ -200,6 +203,14 @@ lib/
   - Associação com disciplinas
   - Gerenciamento de semestres
 
+#### `permission_service.dart` - Permissões
+- **Função:** Gerencia solicitações de permissões em runtime
+- **Responsabilidades:**
+  - Solicitação de permissão de notificações (Android 13+)
+  - Solicitação de permissão de câmera
+  - Solicitação de permissão de acesso a imagens
+  - Verificação de status de permissões
+
 #### `security_service.dart` - Segurança
 - **Função:** Gerencia segurança e validações
 - **Responsabilidades:**
@@ -297,6 +308,23 @@ dependencies:
   firebase_database: ^11.0.2
   firebase_auth: ^5.3.1
   google_sign_in: ^6.2.1
+  
+  # PDF e Impressão
+  pdf: ^3.10.8
+  printing: ^5.12.0
+  
+  # Câmera e OCR
+  camera: ^0.11.0+2
+  google_mlkit_text_recognition: ^0.12.0
+  image_picker: ^1.1.2
+  image: ^4.3.0
+  
+  # IA e Utilitários
+  google_generative_ai: ^0.4.0
+  intl: ^0.19.0
+  http: ^1.2.0
+  flutter_dotenv: ^5.1.0
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:
@@ -508,12 +536,7 @@ firebase-database/
 - ✅ Interface responsiva e moderna
 
 ### **Melhorias Sugeridas 🚀**
-1. **Geração de PDF**
-   - Implementar geração de provas em PDF
-   - Templates personalizáveis
-   - Exportação para impressão
-
-2. **Sistema de Aplicação de Provas**
+1. **Sistema de Aplicação de Provas**
    - Interface para alunos
    - Cronômetro de prova
    - Correção automática
@@ -526,7 +549,7 @@ firebase-database/
 4. **Melhorias de UX**
    - Animações e transições
    - Modo escuro
-   - Notificações push
+   - Notificações push (parcialmente implementado)
 
 5. **Funcionalidades Avançadas**
    - Banco de questões compartilhado

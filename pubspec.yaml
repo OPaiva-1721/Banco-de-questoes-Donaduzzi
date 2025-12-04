@@ -49,11 +49,12 @@ dependencies:
   firebase_auth: ^5.3.1
   google_sign_in: ^6.2.1
 
+  # IA e Utilitários
   intl: ^0.19.0
   http: ^1.2.0  # Para requisições HTTP
   google_generative_ai: ^0.4.0  # Para integração com Gemini
   flutter_dotenv: ^5.1.0  # Para variáveis de ambiente (.env)
-  
+  permission_handler: ^11.3.1  # Para solicitar permissões em runtime
 dev_dependencies:
   flutter_test:
     sdk: flutter
