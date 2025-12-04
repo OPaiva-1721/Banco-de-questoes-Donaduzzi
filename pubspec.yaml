@@ -41,6 +41,22 @@ dependencies:
   firebase_auth: ^5.3.1
   google_sign_in: ^6.2.1
 
+  # PDF e Impressão
+  pdf: ^3.10.8       # Para criar o documento PDF
+  printing: ^5.12.0  # Para pré-visualizar e partilhar o PDF
+  
+  # Câmera e OCR para correção de provas
+  camera: ^0.11.0+2
+  google_mlkit_text_recognition: ^0.12.0
+  image_picker: ^1.1.2
+  image: ^4.3.0  # Para processamento de imagem e detecção de círculos
+  
+  # IA e Utilitários
+  intl: ^0.19.0
+  http: ^1.2.0  # Para requisições HTTP
+  google_generative_ai: ^0.4.0  # Para integração com Gemini
+  flutter_dotenv: ^5.1.0  # Para variáveis de ambiente (.env)
+  permission_handler: ^11.3.1  # Para solicitar permissões em runtime
 dev_dependencies:
   flutter_test:
     sdk: flutter

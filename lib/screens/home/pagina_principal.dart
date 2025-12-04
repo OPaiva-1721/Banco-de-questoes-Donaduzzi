@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../utils/message_utils.dart';
 import '../../utils/firebase_data_populator.dart';
 import '../../services/firebase_service.dart';
+import '../../services/permission_service.dart';
 import '../auth/tela_login.dart';
 import '../professor/criar_prova/criar_prova_screen.dart';
 import '../professor/banco_questoes/banco_questoes_menu_screen.dart';
@@ -9,9 +10,14 @@ import '../professor/provas_geradas_screen.dart';
 import '../professor/disciplinas/gerenciar_disciplinas_screen.dart';
 import '../professor/cursos/gerenciar_cursos_screen.dart';
 
-class TelaInicio extends StatelessWidget {
+class TelaInicio extends StatefulWidget {
   const TelaInicio({super.key});
 
+  @override
+  State<TelaInicio> createState() => _TelaInicioState();
+}
+
+class _TelaInicioState extends State<TelaInicio> {
   static final FirebaseService _firebaseService = FirebaseService();
 
   // Sistema de temas
@@ -19,6 +25,26 @@ class TelaInicio extends StatelessWidget {
   static const Color _backgroundColor = Color(0xFFF5F5F5);
   static const Color _textColor = Color(0xFF333333);
   static const Color _textSecondaryColor = Colors.black54;
+
+  @override
+  void initState() {
+    super.initState();
+    // Solicita permissão de notificações quando a tela é carregada
+    _requestNotificationPermission();
+  }
+
+  /// Solicita permissão de notificações de forma assíncrona
+  Future<void> _requestNotificationPermission() async {
+    // Aguarda um pouco para não bloquear a UI
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final granted = await PermissionService.requestNotificationPermission();
+    if (!granted && mounted) {
+      // Se a permissão foi negada, não fazemos nada
+      // O app continua funcionando normalmente sem notificações
+      print('Permissão de notificações não concedida');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
