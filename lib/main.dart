@@ -1,3 +1,4 @@
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,7 +14,7 @@ void main() async {
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
-    print('Aviso: Arquivo .env não encontrado: $e');
+    if (kDebugMode) debugPrint('Aviso: Arquivo .env não encontrado: $e');
   }
 
   try {
@@ -23,7 +24,7 @@ void main() async {
       );
     }
   } catch (e) {
-    print('Erro ao inicializar Firebase: $e');
+    if (kDebugMode) debugPrint('Erro ao inicializar Firebase: $e');
   }
 
   runApp(const MyApp());

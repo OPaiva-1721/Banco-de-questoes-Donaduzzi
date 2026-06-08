@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 // Imports dos Models
@@ -98,7 +99,7 @@ class _EditarProvaScreenState extends State<EditarProvaScreen> {
           try {
             list.add(fromSnapshot(childSnapshot));
           } catch (e) {
-            print('Erro ao processar item ${childSnapshot.key}: $e');
+            if (kDebugMode) debugPrint('Erro ao processar item ${childSnapshot.key}: $e');
           }
         }
       }

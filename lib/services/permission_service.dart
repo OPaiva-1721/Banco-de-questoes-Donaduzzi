@@ -1,3 +1,4 @@
+﻿import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 
@@ -28,7 +29,7 @@ class PermissionService {
       final result = await Permission.notification.request();
       return result.isGranted;
     } catch (e) {
-      print('Erro ao solicitar permissão de notificações: $e');
+      if (kDebugMode) debugPrint('Erro ao solicitar permissão de notificações: $e');
       return false;
     }
   }
@@ -43,7 +44,7 @@ class PermissionService {
       final status = await Permission.notification.status;
       return status.isGranted;
     } catch (e) {
-      print('Erro ao verificar permissão de notificações: $e');
+      if (kDebugMode) debugPrint('Erro ao verificar permissão de notificações: $e');
       return false;
     }
   }
@@ -65,7 +66,7 @@ class PermissionService {
       final result = await Permission.camera.request();
       return result.isGranted;
     } catch (e) {
-      print('Erro ao solicitar permissão de câmera: $e');
+      if (kDebugMode) debugPrint('Erro ao solicitar permissão de câmera: $e');
       return false;
     }
   }
@@ -94,7 +95,7 @@ class PermissionService {
       final result = await permission.request();
       return result.isGranted;
     } catch (e) {
-      print('Erro ao solicitar permissão de imagens: $e');
+      if (kDebugMode) debugPrint('Erro ao solicitar permissão de imagens: $e');
       return false;
     }
   }

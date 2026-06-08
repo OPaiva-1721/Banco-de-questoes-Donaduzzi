@@ -1,4 +1,5 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
@@ -75,17 +76,17 @@ class GeminiService {
         throw Exception('Gemini não retornou resposta');
       }
 
-      print('=== RESPOSTA DO GEMINI ===');
-      print(textoResposta);
-      print('==========================');
+      if (kDebugMode) debugPrint('=== RESPOSTA DO GEMINI ===');
+      if (kDebugMode) debugPrint(textoResposta);
+      if (kDebugMode) debugPrint('==========================');
 
       // Parsear JSON da resposta
       final respostas = _parsearResposta(textoResposta);
 
-      print('✓ Gemini detectou ${respostas.length} respostas');
+      if (kDebugMode) debugPrint('✓ Gemini detectou ${respostas.length} respostas');
       return respostas;
     } catch (e) {
-      print('Erro ao detectar respostas com Gemini: $e');
+      if (kDebugMode) debugPrint('Erro ao detectar respostas com Gemini: $e');
       rethrow;
     }
   }
@@ -172,11 +173,11 @@ IMPORTANTE:
           }
         });
         
-        print('! ATENÇÃO: Questões com múltiplas respostas detectadas (serão consideradas erradas):');
+        if (kDebugMode) debugPrint('! ATENÇÃO: Questões com múltiplas respostas detectadas (serão consideradas erradas):');
         for (var questao in questoesInvalidas) {
-          print('  - $questao');
+          if (kDebugMode) debugPrint('  - $questao');
         }
-        print('Essas questões não terão resposta marcada e serão consideradas erradas na correção.\n');
+        if (kDebugMode) debugPrint('Essas questões não terão resposta marcada e serão consideradas erradas na correção.\n');
       }
 
       // Converter para Map<int, String> (apenas questões válidas)
@@ -197,8 +198,8 @@ IMPORTANTE:
 
       return respostas;
     } catch (e) {
-      print('Erro ao parsear resposta do Gemini: $e');
-      print('Texto recebido: $textoResposta');
+      if (kDebugMode) debugPrint('Erro ao parsear resposta do Gemini: $e');
+      if (kDebugMode) debugPrint('Texto recebido: $textoResposta');
       rethrow;
     }
   }

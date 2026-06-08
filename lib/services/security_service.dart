@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
+import 'package:prova/core/app_config.dart';
 
 class SecurityService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -7,26 +9,27 @@ class SecurityService {
   late final DatabaseReference _logRef; // _referenciaLogs -> _logRef
 
   SecurityService() {
-    // O nome do nó no Firebase também deve ser em inglês
-    _logRef = _database.ref('security_logs'); // logs_seguranca -> security_logs
+    _logRef = _database.ref(AppConfig.securityLogsCollection);
   }
 
   /// Validates text, checking for null, empty, or max length.
   bool validateText(String? text, {int maxLength = 100}) {
-    // validarTexto -> validateText
-    if (text == null || text.trim().isEmpty) {
-      return false;
-    }
-    if (text.length > maxLength) {
-      return false;
-    }
+    if (text == null || text.trim().isEmpty) return false;
+    if (text.length > maxLength) return false;
     return true;
   }
 
-  /// Cleans input text by trimming whitespace.
-  String sanitizeInput(String text) {
-    // sanitizarEntrada -> sanitizeInput
-    return text.trim();
+  /// Trims whitespace and strips ASCII control characters.
+  String sanitizeInput(String text, {bool forDisplay = false}) {
+    var sanitized = text.trim();
+    sanitized = sanitized.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
+    if (forDisplay) {
+      sanitized = sanitized
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;');
+    }
+    return sanitized;
   }
 
   /// Logs a security activity to the Firebase database.
@@ -64,7 +67,7 @@ class SecurityService {
       final errorString = e.toString();
       if (!errorString.contains('permission-denied') && 
           !errorString.contains('PERMISSION_DENIED')) {
-        print('Error writing to security log: $e');
+        if (kDebugMode) debugPrint('Error writing to security log: $e');
       }
     }
   }

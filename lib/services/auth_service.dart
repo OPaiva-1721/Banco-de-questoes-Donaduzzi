@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:prova/core/app_config.dart';
 import 'package:prova/models/user_model.dart';
 import 'security_service.dart';
 import 'user_service.dart';
@@ -34,8 +36,8 @@ class AuthService {
       throw Exception('Invalid email address.');
     }
     if (!_securityService.validateText(password, maxLength: 100) ||
-        password.length < 6) {
-      throw Exception('Password must be at least 6 characters.');
+        password.length < AppConfig.minPasswordLength) {
+      throw Exception('Password must be at least ${AppConfig.minPasswordLength} characters.');
     }
     if (!_securityService.validateText(name, maxLength: 50)) {
       throw Exception('Invalid name.');
@@ -172,8 +174,7 @@ class AuthService {
         success: true,
       );
     } catch (e) {
-      print('Error signing out: $e');
-      // Não lançar erro aqui, apenas registrar se necessário
+      if (kDebugMode) debugPrint('Error signing out: $e');
     }
   }
 

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '/services/exam_service.dart';
 import '/models/course_model.dart';
 import '/models/discipline_model.dart';
@@ -115,7 +116,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         MessageUtils.mostrarErroFormatado(context, e);
-        print('Erro detalhado ao carregar dados: $e'); // Para depuração
+        if (kDebugMode) debugPrint('Erro detalhado ao carregar dados: $e'); // Para depuração
       }
     }
   }
@@ -237,7 +238,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
         } catch (e) {
           allQuestionsAdded = false;
           // Log do erro, mas continua tentando adicionar as outras questões
-          print('Erro ao adicionar questão $questionId: $e');
+          if (kDebugMode) debugPrint('Erro ao adicionar questão $questionId: $e');
         }
       }
 

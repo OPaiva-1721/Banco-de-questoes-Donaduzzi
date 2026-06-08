@@ -1,5 +1,7 @@
-import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Precisa do Auth para pegar o UID
+﻿import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:prova/core/app_config.dart';
 import 'package:prova/models/user_model.dart';
 import 'security_service.dart';
 import 'dart:async';
@@ -12,7 +14,7 @@ class UserService {
   final SecurityService _securityService = SecurityService();
 
   UserService() {
-    _usersRef = _database.ref('users');
+    _usersRef = _database.ref(AppConfig.usersCollection);
   }
 
   /// Cria ou atualiza o registro de dados de um usuário no Realtime Database.
@@ -28,7 +30,7 @@ class UserService {
         success: false,
       );
       // Não relançar o erro aqui necessariamente, depende da lógica do AuthService
-      print('Failed to save user data: ${e.message}');
+      if (kDebugMode) debugPrint('Failed to save user data: ${e.message}');
     }
   }
 
@@ -51,7 +53,7 @@ class UserService {
       }
       return null; // Usuário não encontrado no banco de dados
     } catch (e) {
-      print('Error fetching user data for $uid: $e');
+      if (kDebugMode) debugPrint('Error fetching user data for $uid: $e');
       return null;
     }
   }
@@ -60,7 +62,7 @@ class UserService {
   Future<bool> updateCurrentUser(Map<String, dynamic> updateData) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) {
-      print('Error: No user logged in to update data.');
+      if (kDebugMode) debugPrint('Error: No user logged in to update data.');
       return false; // Não há usuário logado para atualizar
     }
 
@@ -86,7 +88,7 @@ class UserService {
         'Error updating data for $userId: ${e.toString()}',
         success: false,
       );
-      print('Error updating user data: $e');
+      if (kDebugMode) debugPrint('Error updating user data: $e');
       return false;
     }
   }
@@ -104,7 +106,7 @@ class UserService {
       // Se não houver registro no banco ou faltar o campo, retorna o padrão
       return 'professor';
     } catch (e) {
-      print('Error getting user type for $userId: $e');
+      if (kDebugMode) debugPrint('Error getting user type for $userId: $e');
       return 'professor'; // Padrão em caso de erro
     }
   }
@@ -142,7 +144,7 @@ class UserService {
         'Error setting type for $userId: ${e.toString()}',
         success: false,
       );
-      print('Error setting user type: $e');
+      if (kDebugMode) debugPrint('Error setting user type: $e');
       return false;
     }
   }

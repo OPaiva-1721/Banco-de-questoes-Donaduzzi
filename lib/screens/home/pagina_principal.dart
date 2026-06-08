@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../utils/message_utils.dart';
 import '../../services/firebase_service.dart';
@@ -20,7 +21,7 @@ class TelaInicio extends StatefulWidget {
 }
 
 class _TelaInicioState extends State<TelaInicio> {
-  static final FirebaseService _firebaseService = FirebaseService();
+  final FirebaseService _firebaseService = FirebaseService();
 
   @override
   void initState() {
@@ -38,7 +39,7 @@ class _TelaInicioState extends State<TelaInicio> {
     if (!granted && mounted) {
       // Se a permissão foi negada, não fazemos nada
       // O app continua funcionando normalmente sem notificações
-      print('Permissão de notificações não concedida');
+      if (kDebugMode) debugPrint('Permissão de notificações não concedida');
     }
   }
 
