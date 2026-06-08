@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../core/app_colors.dart';
 import '../../../services/subject_service.dart';
 import '../../../utils/message_utils.dart';
+import '../../../widgets/app_card.dart';
+import '../../../widgets/app_save_button.dart';
+import '../../../widgets/form_field_section.dart';
 
 class AdicionarDisciplinaScreen extends StatefulWidget {
   const AdicionarDisciplinaScreen({super.key});
@@ -11,13 +15,7 @@ class AdicionarDisciplinaScreen extends StatefulWidget {
 }
 
 class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
-  static const Color _primaryColor = Color(0xFF541822);
-  static const Color _backgroundColor = Color(0xFFF5F5F5);
-  static const Color _textColor = Color(0xFF333333);
-  static const Color _whiteColor = Colors.white;
-
   final SubjectService _subjectService = SubjectService();
-
   late final TextEditingController _nomeController;
   int _semestreSelecionado = 1;
   bool _isLoading = false;
@@ -44,164 +42,74 @@ class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
 
   Future<void> _salvarDisciplina() async {
     if (!_validarFormulario()) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       await _subjectService.createSubject(
         _nomeController.text.trim(),
         _semestreSelecionado,
       );
-
       if (mounted) {
         MessageUtils.mostrarSucesso(context, 'Disciplina criada com sucesso!');
         Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) {
-        MessageUtils.mostrarErroFormatado(context, e);
-      }
+      if (mounted) MessageUtils.mostrarErroFormatado(context, e);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Widget _buildContainer({required Widget child, double? height}) {
-    return Container(
-      width: double.infinity,
-      height: height,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _whiteColor,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Nova Disciplina'),
-        backgroundColor: _primaryColor,
+        backgroundColor: AppColors.primary,
         elevation: 0,
-        foregroundColor: _whiteColor,
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildContainer(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Nome da Disciplina',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+            AppCard(
+              child: FormFieldSection(
+                label: 'Nome da Disciplina',
+                field: TextField(
+                  controller: _nomeController,
+                  decoration: const InputDecoration(
+                    hintText: 'Ex: Matemática, Português, etc.',
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _nomeController,
-                    decoration: InputDecoration(
-                      hintText: 'Ex: Matemática, Português, etc.',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 20),
-            _buildContainer(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Semestre',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+            AppCard(
+              child: FormFieldSection(
+                label: 'Semestre',
+                field: DropdownButtonFormField<int>(
+                  initialValue: _semestreSelecionado,
+                  decoration: const InputDecoration(),
+                  items: List.generate(
+                    10,
+                    (index) => DropdownMenuItem(
+                      value: index + 1,
+                      child: Text('${index + 1}º Semestre'),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<int>(
-                    initialValue: _semestreSelecionado,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                    ),
-                    items: List.generate(
-                      10,
-                      (index) => DropdownMenuItem(
-                        value: index + 1,
-                        child: Text('${index + 1}º Semestre'),
-                      ),
-                    ),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _semestreSelecionado = value;
-                        });
-                      }
-                    },
-                  ),
-                ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _semestreSelecionado = value);
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _salvarDisciplina,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primaryColor,
-                foregroundColor: _whiteColor,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(_whiteColor),
-                      ),
-                    )
-                  : const Text(
-                      'Salvar Disciplina',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+            AppSaveButton(
+              label: 'Salvar Disciplina',
+              isLoading: _isLoading,
+              onPressed: _salvarDisciplina,
             ),
           ],
         ),
