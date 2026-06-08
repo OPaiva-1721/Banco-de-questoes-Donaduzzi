@@ -1,6 +1,7 @@
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'exam_question_link_model.dart'; 
+import 'exam_question_link_model.dart';
 
 class Exam {
   final String? id;
@@ -89,7 +90,7 @@ class Exam {
               .map((item) => item.toString()) 
               .toList();
         } catch (e) {
-          print("===== ERRO EM EXAM_MODEL (LIST): Falha ao converter contentIds. $e =====");
+          if (kDebugMode) debugPrint("===== ERRO EM EXAM_MODEL (LIST): Falha ao converter contentIds. $e =====");
         }
       } else if (rawContentIds is Map) {
         try {
@@ -98,7 +99,7 @@ class Exam {
               .map((item) => item.toString()) 
               .toList();
         } catch (e) {
-          print("===== ERRO EM EXAM_MODEL (MAP): Falha ao converter contentIds. $e =====");
+          if (kDebugMode) debugPrint("===== ERRO EM EXAM_MODEL (MAP): Falha ao converter contentIds. $e =====");
         }
       }
     }

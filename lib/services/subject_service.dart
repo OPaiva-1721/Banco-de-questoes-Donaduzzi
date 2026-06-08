@@ -1,5 +1,7 @@
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:prova/core/app_config.dart';
 import 'security_service.dart';
 import 'dart:async';
 
@@ -11,8 +13,8 @@ class SubjectService {
   final SecurityService _securityService = SecurityService();
 
   SubjectService() {
-    _subjectsRef = _database.ref('subjects');
-    _questionsRef = _database.ref('questions');
+    _subjectsRef = _database.ref(AppConfig.subjectsCollection);
+    _questionsRef = _database.ref(AppConfig.questionsCollection);
   }
 
   Future<String?> createSubject(String name, int semester) async {
@@ -72,7 +74,7 @@ class SubjectService {
     try {
       return await _subjectsRef.child(subjectId).get();
     } catch (e) {
-      print('Error fetching subject: $e');
+      if (kDebugMode) debugPrint('Error fetching subject: $e');
       return null;
     }
   }

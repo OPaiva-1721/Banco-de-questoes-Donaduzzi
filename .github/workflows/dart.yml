@@ -1,4 +1,4 @@
-name: iOS-ipa-build
+name: iOS IPA Build
 
 on:
   push:
@@ -6,28 +6,51 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   build-ios:
-    name: 🎉 iOS Build
+    name: iOS Build
     runs-on: macos-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.x'
           channel: 'stable'
           architecture: x64
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            .dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
 
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Inject GoogleService-Info.plist
+        env:
+          GOOGLE_SERVICE_INFO: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
+        run: echo "$GOOGLE_SERVICE_INFO" | base64 --decode > ios/Runner/GoogleService-Info.plist
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test
+
       - name: Cache CocoaPods
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ios/Pods
@@ -39,142 +62,39 @@ jobs:
 
       - name: Setup CocoaPods
         timeout-minutes: 15
-        run: |
-          cd ios
-          echo "🔍 Checking CocoaPods version..."
-          pod --version
-          echo "📦 Updating CocoaPods repo..."
-          pod repo update --verbose || echo "⚠️ pod repo update had issues, continuing anyway..."
-          echo "📥 Installing pods..."
-          pod install --repo-update --verbose
-          echo "✅ Pod install completed!"
+        run: cd ios && pod install --repo-update
 
-      - name: Configure Xcode for no-code signing
+      - name: Build iOS
         run: |
-          cd ios
-          python3 << 'EOF'
-          import re
-          
-          # Read the project file
-          with open('Runner.xcodeproj/project.pbxproj', 'r') as f:
-              content = f.read()
-          
-          # Disable code signing completely
-          replacements = [
-              (r'DEVELOPMENT_TEAM = [^;]+;', 'DEVELOPMENT_TEAM = "";'),
-              (r'CODE_SIGN_IDENTITY = "[^"]+";', 'CODE_SIGN_IDENTITY = "";'),
-              (r'"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = "[^"]+";', '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "";'),
-              (r'CODE_SIGN_STYLE = Automatic;', 'CODE_SIGN_STYLE = Manual;'),
-              (r'ProvisioningStyle = Automatic;', 'ProvisioningStyle = Manual;'),
-              (r'CODE_SIGNING_REQUIRED = YES;', 'CODE_SIGNING_REQUIRED = NO;'),
-              (r'CODE_SIGNING_ALLOWED = YES;', 'CODE_SIGNING_ALLOWED = NO;'),
-          ]
-          
-          for pattern, replacement in replacements:
-              content = re.sub(pattern, replacement, content)
-          
-          # Write back
-          with open('Runner.xcodeproj/project.pbxproj', 'w') as f:
-              f.write(content)
-          
-          print("✅ Code signing disabled in Xcode project")
-          EOF
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
 
-      - name: Build iOS with xcodebuild directly
-        timeout-minutes: 30
-        run: |
-          cd ios
-          echo "🧹 Cleaning previous build..."
-          xcodebuild clean -workspace Runner.xcworkspace -scheme Runner || true
-          
-          echo "🔨 Building iOS app without code signing..."
-          # Build with explicit derivedDataPath to control output location
-          xcodebuild build \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath ./build \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            PROVISIONING_PROFILE="" \
-            ONLY_ACTIVE_ARCH=NO
-            
-          echo "📦 Searching for build output..."
-          mkdir -p ../build/ios/iphoneos
-          
-          # Try multiple possible locations
-          RUNNER_APP=""
-          
-          # Check in explicit build directory
-          if [ -d "build/Build/Products/Release-iphoneos/Runner.app" ]; then
-            RUNNER_APP="build/Build/Products/Release-iphoneos/Runner.app"
-            echo "✅ Found Runner.app in build/Build/Products/Release-iphoneos/"
-          elif [ -d "build/Release-iphoneos/Runner.app" ]; then
-            RUNNER_APP="build/Release-iphoneos/Runner.app"
-            echo "✅ Found Runner.app in build/Release-iphoneos/"
-          else
-            echo "⚠️ Searching in DerivedData..."
-            # Search in DerivedData (default location)
-            DERIVED_DATA=$(find ~/Library/Developer/Xcode/DerivedData -name "Runner.app" -type d -path "*/Build/Products/Release-iphoneos/*" 2>/dev/null | head -1)
-            if [ -n "$DERIVED_DATA" ]; then
-              RUNNER_APP="$DERIVED_DATA"
-              echo "✅ Found Runner.app in DerivedData: $DERIVED_DATA"
-            else
-              echo "⚠️ Searching in current directory..."
-              # Search anywhere in ios directory
-              RUNNER_APP=$(find . -name "Runner.app" -type d | head -1)
-              if [ -n "$RUNNER_APP" ]; then
-                echo "✅ Found Runner.app at: $RUNNER_APP"
-              fi
-            fi
-          fi
-          
-          if [ -z "$RUNNER_APP" ] || [ ! -d "$RUNNER_APP" ]; then
-            echo "❌ Runner.app not found anywhere!"
-            echo "📂 Listing build directory:"
-            ls -la build/ || true
-            echo "📂 Searching for any .app files:"
-            find . -name "*.app" -type d 2>/dev/null | head -10 || true
-            exit 1
-          fi
-          
-          echo "📋 Copying Runner.app from: $RUNNER_APP"
-          cp -R "$RUNNER_APP" ../build/ios/iphoneos/Runner.app
-          echo "✅ Build copied successfully!"
-          echo "🔍 Verifying copied file..."
-          ls -la ../build/ios/iphoneos/Runner.app || exit 1
-
-      - name: Create Payload and prepare IPA
+      - name: Create IPA
         run: |
           cd build/ios/iphoneos
-          echo "🔍 Checking if Runner.app exists..."
-          if [ ! -d "Runner.app" ]; then
-            echo "❌ Runner.app not found in build/ios/iphoneos/"
-            echo "📂 Listing contents:"
-            ls -la
-            exit 1
-          fi
-          echo "✅ Runner.app found!"
-          echo "📦 Creating Payload directory..."
           mkdir -p Payload
-          echo "📁 Moving Runner.app to Payload..."
           mv Runner.app Payload/
-          echo "📦 Creating IPA file..."
           zip -qq -r -9 FlutterIpaExport.ipa Payload
-          echo "✅ IPA file created successfully!"
-          ls -lh FlutterIpaExport.ipa
+          echo "IPA size: $(du -sh FlutterIpaExport.ipa | cut -f1)"
+
+      - name: Get release tag
+        id: version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | head -1 | awk '{print $2}' | cut -d'+' -f1)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "tag=v${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Upload to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/ios/iphoneos/FlutterIpaExport.ipa
-          tag: v1.0
-          overwrite: true
-          body: "This is first release"
-
+          tag: ${{ steps.version.outputs.tag }}
+          overwrite: false
+          body: |
+            **Versão:** ${{ steps.version.outputs.version }}
+            **Commit:** ${{ github.sha }}
+            **Branch:** ${{ github.ref_name }}

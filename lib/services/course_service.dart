@@ -1,5 +1,7 @@
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:prova/core/app_config.dart';
 import 'security_service.dart';
 import 'dart:async';
 
@@ -10,7 +12,7 @@ class CourseService {
   final SecurityService _securityService = SecurityService();
 
   CourseService() {
-    _coursesRef = _database.ref('courses');
+    _coursesRef = _database.ref(AppConfig.coursesCollection);
   }
 
   Future<String?> createCourse(String name) async {
@@ -58,7 +60,7 @@ class CourseService {
     try {
       return await _coursesRef.child(courseId).get();
     } catch (e) {
-      print('Error fetching course: $e');
+      if (kDebugMode) debugPrint('Error fetching course: $e');
       return null;
     }
   }

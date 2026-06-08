@@ -1,0 +1,59 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+
+    "questions": {
+      ".read": "auth !== null",
+      "$questionId": {
+        ".write": "auth !== null"
+      },
+      ".indexOn": ["subjectId", "contentId"]
+    },
+
+    "exams": {
+      ".read": "auth !== null",
+      "$examId": {
+        ".write": "auth !== null"
+      },
+      ".indexOn": ["userId"]
+    },
+
+    "subjects": {
+      ".read": "auth !== null",
+      "$subjectId": {
+        ".write": "auth !== null"
+      },
+      ".indexOn": ["semester"]
+    },
+
+    "courses": {
+      ".read": "auth !== null",
+      "$courseId": {
+        ".write": "auth !== null"
+      }
+    },
+
+    "contents": {
+      ".read": "auth !== null",
+      "$contentId": {
+        ".write": "auth !== null"
+      },
+      ".indexOn": ["subjectId"]
+    },
+
+    "security_logs": {
+      "$logId": {
+        ".read": "auth !== null && auth.uid === data.child('userId').val()",
+        ".write": "auth !== null"
+      }
+    }
+  }
+}

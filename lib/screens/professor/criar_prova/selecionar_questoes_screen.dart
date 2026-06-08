@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart'; // NECESSÁRIO PARA CARREGAR CONTEÚDOS
 import '/models/question_model.dart';
 import '/models/option_model.dart';
@@ -110,7 +111,7 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
                   try {
                       todosConteudosList.add(Content.fromSnapshot(childSnapshot));
                   } catch (e) {
-                      print('Erro ao processar conteúdo: $e'); // Log de erro
+                      if (kDebugMode) debugPrint('Erro ao processar conteúdo: $e'); // Log de erro
                   }
               }
           }

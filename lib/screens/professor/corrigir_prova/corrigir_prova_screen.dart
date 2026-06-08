@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
@@ -48,7 +48,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
 
   bool _checkIsWindowsDesktop() {
     if (kIsWeb) return false;
-    return false;
+    return io.Platform.isWindows;
   }
 
   @override
@@ -136,11 +136,11 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
             if (respostaCorreta != null) {
               gabarito[numeroQuestao] = respostaCorreta;
             } else {
-              print('Aviso: Questão $numeroQuestao não tem alternativa correta marcada.');
+              if (kDebugMode) debugPrint('Aviso: Questão $numeroQuestao não tem alternativa correta marcada.');
             }
           }
         } catch (e) {
-          print('Erro ao carregar questão ${link.questionId}: $e');
+          if (kDebugMode) debugPrint('Erro ao carregar questão ${link.questionId}: $e');
         }
       }
 
@@ -303,7 +303,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
             }
           }
       } catch (e) {
-          print('Erro ao buscar questão ${link.questionId} para alternativas: $e');
+          if (kDebugMode) debugPrint('Erro ao buscar questão ${link.questionId} para alternativas: $e');
         }
       }
       
@@ -316,15 +316,15 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
       }
 
       // Chamar Gemini para detectar respostas
-      print('=== ENVIANDO IMAGEM PARA GEMINI ===');
-      print('Alternativas detectadas: $alternativas');
-      print('Total questões na prova: $_totalQuestoes');
+      if (kDebugMode) debugPrint('=== ENVIANDO IMAGEM PARA GEMINI ===');
+      if (kDebugMode) debugPrint('Alternativas detectadas: $alternativas');
+      if (kDebugMode) debugPrint('Total questões na prova: $_totalQuestoes');
       final respostas = await _geminiService.detectarRespostas(
         imageBytes: imageBytes,
         totalQuestoes: _totalQuestoes,
         alternativas: alternativas,
       );
-      print('=== RESPOSTAS DETECTADAS: ${respostas.length} ===');
+      if (kDebugMode) debugPrint('=== RESPOSTAS DETECTADAS: ${respostas.length} ===');
 
       if (respostas.isEmpty) {
         if (mounted) {
@@ -400,8 +400,8 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     
     final textoNormalizado = texto.replaceAll(RegExp(r'\s+'), ' ').trim();
     
-    print('=== PROCESSANDO TEXTO NORMALIZADO ===');
-    print(textoNormalizado);
+    if (kDebugMode) debugPrint('=== PROCESSANDO TEXTO NORMALIZADO ===');
+    if (kDebugMode) debugPrint(textoNormalizado);
     
     final regex1 = RegExp(r'(?:Questão|Q\.?)\s*(\d+)[\s:-\-]*([A-E])', caseSensitive: false);
     final matches1 = regex1.allMatches(textoNormalizado);
@@ -412,7 +412,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
       
       if (numeroQuestao != null && letra != null) {
         respostas[numeroQuestao] = letra;
-        print('Encontrado: Questão $numeroQuestao = $letra');
+        if (kDebugMode) debugPrint('Encontrado: Questão $numeroQuestao = $letra');
       }
     }
 
@@ -427,7 +427,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
         if (numeroQuestao != null && letra != null) {
           if (numeroQuestao >= 1 && numeroQuestao <= _totalQuestoes) {
             respostas[numeroQuestao] = letra;
-            print('Encontrado: $numeroQuestao = $letra');
+            if (kDebugMode) debugPrint('Encontrado: $numeroQuestao = $letra');
           }
         }
       }
@@ -443,13 +443,13 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
           final letra = match3.group(2)?.toUpperCase();
           if (numeroQuestao != null && letra != null && numeroQuestao >= 1 && numeroQuestao <= _totalQuestoes) {
             respostas[numeroQuestao] = letra;
-            print('Encontrado (linha): $numeroQuestao = $letra');
+            if (kDebugMode) debugPrint('Encontrado (linha): $numeroQuestao = $letra');
           }
         }
       }
     }
 
-    print('=== TOTAL DE RESPOSTAS ENCONTRADAS: ${respostas.length} ===');
+    if (kDebugMode) debugPrint('=== TOTAL DE RESPOSTAS ENCONTRADAS: ${respostas.length} ===');
     return respostas;
   }
 
@@ -472,18 +472,18 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     final width = processImage.width;
     final height = processImage.height;
     
-    print('=== DETECÇÃO DE TABELA E CÍRCULOS ===');
-    print('Tamanho imagem: ${width}x${height}');
+    if (kDebugMode) debugPrint('=== DETECÇÃO DE TABELA E CÍRCULOS ===');
+    if (kDebugMode) debugPrint('Tamanho imagem: ${width}x${height}');
     
     final linhasHorizontais = _detectarLinhasHorizontais(processImage);
-    print('Linhas horizontais encontradas: ${linhasHorizontais.length}');
+    if (kDebugMode) debugPrint('Linhas horizontais encontradas: ${linhasHorizontais.length}');
     
     final linhasVerticais = _detectarLinhasVerticais(processImage);
-    print('Linhas verticais encontradas: ${linhasVerticais.length}');
+    if (kDebugMode) debugPrint('Linhas verticais encontradas: ${linhasVerticais.length}');
     
     // Se não detectou linhas suficientes OU se detectou poucas colunas, usar método melhorado
     if (linhasHorizontais.length < 2 || linhasVerticais.length < 2 || linhasVerticais.length < 5) {
-      print('AVISO: Não foi possível detectar a estrutura completa da tabela. Usando método de detecção global de círculos.');
+      if (kDebugMode) debugPrint('AVISO: Não foi possível detectar a estrutura completa da tabela. Usando método de detecção global de círculos.');
       return _detectarCirculosGlobal(processImage);
     }
     
@@ -508,11 +508,11 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
         ? colunasAlternativas.length 
         : 5;
     
-    print('Estrutura detectada: $numLinhas linhas x $numColunas colunas');
+    if (kDebugMode) debugPrint('Estrutura detectada: $numLinhas linhas x $numColunas colunas');
     
     // Se detectou poucas colunas, usar método global
     if (numColunas < 3) {
-      print('AVISO: Poucas colunas detectadas. Usando método de detecção global de círculos.');
+      if (kDebugMode) debugPrint('AVISO: Poucas colunas detectadas. Usando método de detecção global de círculos.');
       return _detectarCirculosGlobal(processImage);
     }
     
@@ -539,7 +539,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
       final safeCellHeight = safeLinhaBottom - safeLinhaTop;
       final searchAreaY = (safeCellHeight * 0.3).round().clamp(10, 30);
       
-      print('Questão $questaoNum: Y entre $safeLinhaTop e $safeLinhaBottom (original: $linhaTop-$linhaBottom), centro: $safeLinhaCenterY');
+      if (kDebugMode) debugPrint('Questão $questaoNum: Y entre $safeLinhaTop e $safeLinhaBottom (original: $linhaTop-$linhaBottom), centro: $safeLinhaCenterY');
       
       // Procurar em cada coluna de alternativa
       for (int j = 0; j < numColunas && j < alternativas.length; j++) {
@@ -588,7 +588,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
         }
         
         darknessMap[alternativas[j]] = bestDarkness;
-        print('Questão $questaoNum, Alternativa ${alternativas[j]}: Escuridão = ${bestDarkness.toStringAsFixed(1)} (pos: $bestX,$bestY, célula segura: $safeColLeft-$safeColRight, $safeLinhaTop-$safeLinhaBottom)');
+        if (kDebugMode) debugPrint('Questão $questaoNum, Alternativa ${alternativas[j]}: Escuridão = ${bestDarkness.toStringAsFixed(1)} (pos: $bestX,$bestY, célula segura: $safeColLeft-$safeColRight, $safeLinhaTop-$safeLinhaBottom)');
       }
       
       // Usar a mesma lógica de comparação relativa
@@ -619,14 +619,14 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
              diferencaAbsoluta > 10 ||
              maisEscura.value > 25)) {
           respostas[questaoNum] = maisEscura.key;
-          print('✓ Questão $questaoNum: ${maisEscura.key} (escuridão: ${maisEscura.value.toStringAsFixed(1)}, dif%: ${diferencaPercentual.toStringAsFixed(1)}%, difAbs: ${diferencaAbsoluta.toStringAsFixed(1)})');
+          if (kDebugMode) debugPrint('✓ Questão $questaoNum: ${maisEscura.key} (escuridão: ${maisEscura.value.toStringAsFixed(1)}, dif%: ${diferencaPercentual.toStringAsFixed(1)}%, difAbs: ${diferencaAbsoluta.toStringAsFixed(1)})');
         } else {
-          print('✗ Questão $questaoNum: Nenhuma alternativa detectada (max: ${maisEscura.value.toStringAsFixed(1)}, dif%: ${diferencaPercentual.toStringAsFixed(1)}%, difAbs: ${diferencaAbsoluta.toStringAsFixed(1)})');
+          if (kDebugMode) debugPrint('✗ Questão $questaoNum: Nenhuma alternativa detectada (max: ${maisEscura.value.toStringAsFixed(1)}, dif%: ${diferencaPercentual.toStringAsFixed(1)}%, difAbs: ${diferencaAbsoluta.toStringAsFixed(1)})');
         }
       }
     }
     
-    print('=== TOTAL CÍRCULOS DETECTADOS: ${respostas.length} ===');
+    if (kDebugMode) debugPrint('=== TOTAL CÍRCULOS DETECTADOS: ${respostas.length} ===');
     return respostas;
   }
 
@@ -719,11 +719,11 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     
     final alternativas = ['A', 'B', 'C', 'D', 'E'];
     
-    print('=== DETECÇÃO GLOBAL DE CÍRCULOS ===');
-    print('Altura estimada linha: ${estimatedRowHeight.round()}');
-    print('Largura estimada coluna: ${estimatedColWidth.round()}');
-    print('Tamanho círculo: $estimatedCircleSize');
-    print('Threshold mínimo: $thresholdMinimo');
+    if (kDebugMode) debugPrint('=== DETECÇÃO GLOBAL DE CÍRCULOS ===');
+    if (kDebugMode) debugPrint('Altura estimada linha: ${estimatedRowHeight.round()}');
+    if (kDebugMode) debugPrint('Largura estimada coluna: ${estimatedColWidth.round()}');
+    if (kDebugMode) debugPrint('Tamanho círculo: $estimatedCircleSize');
+    if (kDebugMode) debugPrint('Threshold mínimo: $thresholdMinimo');
     
     // Primeiro passo: detectar TODOS os círculos preenchidos na imagem
     final List<Map<String, dynamic>> circulosEncontrados = [];
@@ -734,7 +734,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     final startX = estimatedColWidth.round();
     final endX = width;
     
-    print('Área de busca: X($startX-$endX) Y($startY-$endY)');
+    if (kDebugMode) debugPrint('Área de busca: X($startX-$endX) Y($startY-$endY)');
     
     // Passo 1: Busca rápida nas áreas esperadas de cada célula (muito mais rápido)
     final minDistance = estimatedCircleSize * 0.7; // Distância mínima entre círculos
@@ -813,13 +813,13 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
               'questao': questaoNum,
               'alternativa': alternativas[altIndex],
             });
-            print('  Círculo encontrado na Questão $questaoNum, Alternativa ${alternativas[altIndex]}: pos($bestX,$bestY), escuridão: ${bestDarkness.toStringAsFixed(1)}');
+            if (kDebugMode) debugPrint('  Círculo encontrado na Questão $questaoNum, Alternativa ${alternativas[altIndex]}: pos($bestX,$bestY), escuridão: ${bestDarkness.toStringAsFixed(1)}');
           }
         }
       }
     }
     
-    print('Total de círculos preenchidos encontrados: ${circulosEncontrados.length}');
+    if (kDebugMode) debugPrint('Total de círculos preenchidos encontrados: ${circulosEncontrados.length}');
     
     // Passo 2: Associar círculos às questões (já temos a associação inicial, mas vamos validar)
     // Agrupar por questão e escolher o mais escuro de cada questão
@@ -860,16 +860,16 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
         // Se a diferença é significativa (pelo menos 5 pontos) ou se é o único
         if (diferenca > 5 || circulosDaQuestao.length == 1) {
           respostas[questaoNum] = alternativa;
-          print('✓ Questão $questaoNum: $alternativa (escuridão: ${circuloDarkness.toStringAsFixed(1)}, pos: $circuloX,$circuloY, dif: ${diferenca.toStringAsFixed(1)})');
+          if (kDebugMode) debugPrint('✓ Questão $questaoNum: $alternativa (escuridão: ${circuloDarkness.toStringAsFixed(1)}, pos: $circuloX,$circuloY, dif: ${diferenca.toStringAsFixed(1)})');
         } else {
-          print('✗ Questão $questaoNum: Múltiplos círculos encontrados, diferença insuficiente (mais escuro: ${circuloDarkness.toStringAsFixed(1)}, segundo: ${segundaMaisEscura.toStringAsFixed(1)})');
+          if (kDebugMode) debugPrint('✗ Questão $questaoNum: Múltiplos círculos encontrados, diferença insuficiente (mais escuro: ${circuloDarkness.toStringAsFixed(1)}, segundo: ${segundaMaisEscura.toStringAsFixed(1)})');
         }
       } else {
-        print('✗ Questão $questaoNum: Nenhum círculo encontrado');
+        if (kDebugMode) debugPrint('✗ Questão $questaoNum: Nenhum círculo encontrado');
       }
     }
     
-    print('=== TOTAL CÍRCULOS DETECTADOS: ${respostas.length} ===');
+    if (kDebugMode) debugPrint('=== TOTAL CÍRCULOS DETECTADOS: ${respostas.length} ===');
     return respostas;
   }
 
@@ -887,11 +887,11 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     
     final alternativas = ['A', 'B', 'C', 'D', 'E'];
     
-    print('=== MÉTODO ALTERNATIVO MELHORADO ===');
-    print('Altura estimada linha: ${estimatedRowHeight.round()}');
-    print('Largura estimada coluna: ${estimatedColWidth.round()}');
-    print('Raio de busca: $searchRadius');
-    print('Threshold mínimo: 20.0');
+    if (kDebugMode) debugPrint('=== MÉTODO ALTERNATIVO MELHORADO ===');
+    if (kDebugMode) debugPrint('Altura estimada linha: ${estimatedRowHeight.round()}');
+    if (kDebugMode) debugPrint('Largura estimada coluna: ${estimatedColWidth.round()}');
+    if (kDebugMode) debugPrint('Raio de busca: $searchRadius');
+    if (kDebugMode) debugPrint('Threshold mínimo: 20.0');
     
     for (int questaoNum = 1; questaoNum <= _totalQuestoes; questaoNum++) {
       // Calcular posição Y da linha (pular cabeçalho)
@@ -908,7 +908,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
       // Limitar a busca verticalmente à área da linha (muito restrito)
       final maxSearchY = ((safeRowYEnd - safeRowYStart) * 0.3).round().clamp(10, 30);
       
-      print('Questão $questaoNum: Y entre $safeRowYStart e $safeRowYEnd (original: $rowYStart-$rowYEnd), centro: $rowYCenter');
+      if (kDebugMode) debugPrint('Questão $questaoNum: Y entre $safeRowYStart e $safeRowYEnd (original: $rowYStart-$rowYEnd), centro: $rowYCenter');
       
       // Armazenar escuridão de cada alternativa
       final Map<String, double> darknessMap = {};
@@ -958,7 +958,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
         }
         
         darknessMap[alternativas[altIndex]] = bestDarkness;
-        print('Questão $questaoNum, Alternativa ${alternativas[altIndex]}: Escuridão = ${bestDarkness.toStringAsFixed(1)} (pos: $bestX,$bestY, célula segura: $safeColXStart-$safeColXEnd, $safeRowYStart-$safeRowYEnd)');
+        if (kDebugMode) debugPrint('Questão $questaoNum, Alternativa ${alternativas[altIndex]}: Escuridão = ${bestDarkness.toStringAsFixed(1)} (pos: $bestX,$bestY, célula segura: $safeColXStart-$safeColXEnd, $safeRowYStart-$safeRowYEnd)');
       }
       
       // Encontrar a alternativa mais escura (comparação relativa)
@@ -998,9 +998,9 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
              diferencaAbsoluta > 10 ||
              maisEscura.value > 25)) {
           respostas[questaoNum] = maisEscura.key;
-          print('✓ Questão $questaoNum: ${maisEscura.key} (escuridão: ${maisEscura.value.toStringAsFixed(1)}, dif%: ${diferencaPercentual.toStringAsFixed(1)}%, difAbs: ${diferencaAbsoluta.toStringAsFixed(1)})');
+          if (kDebugMode) debugPrint('✓ Questão $questaoNum: ${maisEscura.key} (escuridão: ${maisEscura.value.toStringAsFixed(1)}, dif%: ${diferencaPercentual.toStringAsFixed(1)}%, difAbs: ${diferencaAbsoluta.toStringAsFixed(1)})');
         } else {
-          print('✗ Questão $questaoNum: Nenhuma alternativa detectada (max: ${maisEscura.value.toStringAsFixed(1)}, dif%: ${diferencaPercentual.toStringAsFixed(1)}%, difAbs: ${diferencaAbsoluta.toStringAsFixed(1)})');
+          if (kDebugMode) debugPrint('✗ Questão $questaoNum: Nenhuma alternativa detectada (max: ${maisEscura.value.toStringAsFixed(1)}, dif%: ${diferencaPercentual.toStringAsFixed(1)}%, difAbs: ${diferencaAbsoluta.toStringAsFixed(1)})');
         }
       }
     }
@@ -1053,7 +1053,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     
     if (respostasCirculos.isNotEmpty) {
       respostas.addAll(respostasCirculos);
-      print('Usando detecção de círculos: ${respostas.length} respostas');
+      if (kDebugMode) debugPrint('Usando detecção de círculos: ${respostas.length} respostas');
     }
     
     final respostasOCR = _extrairRespostasDoTexto(textoOCR);
@@ -1061,7 +1061,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     for (var entry in respostasOCR.entries) {
       if (!respostas.containsKey(entry.key)) {
         respostas[entry.key] = entry.value;
-        print('Adicionando do OCR: Questão ${entry.key} = ${entry.value}');
+        if (kDebugMode) debugPrint('Adicionando do OCR: Questão ${entry.key} = ${entry.value}');
       }
     }
     

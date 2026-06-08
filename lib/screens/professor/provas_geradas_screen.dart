@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'dart:async';
 
@@ -87,7 +88,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
             list.add(fromSnapshot(childSnapshot));
           } catch (e) {
             // Se um item falhar na conversão (ex: erro de tipo), loga e continua
-            print('Erro ao processar item ${childSnapshot.key}: $e');
+            if (kDebugMode) debugPrint('Erro ao processar item ${childSnapshot.key}: $e');
           }
         }
       }
@@ -166,7 +167,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         MessageUtils.mostrarErroFormatado(context, e);
-        print('Erro detalhado ao carregar dados: $e');
+        if (kDebugMode) debugPrint('Erro detalhado ao carregar dados: $e');
       }
     }
   }

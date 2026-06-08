@@ -1,8 +1,10 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:prova/core/app_config.dart';
 import 'security_service.dart';
 import 'dart:async';
-import '../models/content_model.dart'; 
+import '../models/content_model.dart';
 
 class ContentService {
   final FirebaseDatabase _database = FirebaseDatabase.instance;
@@ -11,7 +13,7 @@ class ContentService {
   final SecurityService _securityService = SecurityService();
 
   ContentService() {
-    _contentRef = _database.ref('contents');
+    _contentRef = _database.ref(AppConfig.contentsCollection);
   }
 
   /// Creates a new content item linked to a subject.
@@ -84,7 +86,7 @@ class ContentService {
       }
       return null;
     } catch (e) {
-      print('Error fetching content: $e');
+      if (kDebugMode) debugPrint('Error fetching content: $e');
       return null;
     }
   }
@@ -126,11 +128,18 @@ class ContentService {
     }
   }
 
-  /// Deletes a content item.
+  /// Deletes a content item. Throws if referenced by any question.
   Future<bool> deleteContent(String contentId) async {
-    try {
-      // TODO: Add check to see if content is used by questions
+    final questionsSnap = await _database
+        .ref(AppConfig.questionsCollection)
+        .orderByChild('contentId')
+        .equalTo(contentId)
+        .get();
+    if (questionsSnap.exists) {
+      throw Exception('Conteúdo está sendo usado por questões e não pode ser deletado.');
+    }
 
+    try {
       await _contentRef.child(contentId).remove();
 
       await _securityService.logSecurityActivity(
