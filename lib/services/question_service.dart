@@ -2,8 +2,6 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'security_service.dart';
 import '../models/question_model.dart';
-import '../models/option_model.dart';
-import '../models/enums.dart';
 import '../core/exceptions/app_exceptions.dart';
 import '../utils/error_messages.dart';
 import 'dart:async';

@@ -370,9 +370,7 @@ class PdfService {
     final List<Question> questoes = [];
     for (final link in questionLinks) {
       final questao = await _questionService.getQuestion(link.questionId);
-      if (questao != null) {
-        questoes.add(questao);
-      }
+      questoes.add(questao);
     }
     return questoes;
   }

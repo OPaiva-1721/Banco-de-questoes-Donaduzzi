@@ -65,7 +65,7 @@ class _EditarDisciplinaScreenState extends State<EditarDisciplinaScreen> {
         'semester': _semestreSelecionado,
       };
 
-      final sucesso = await _subjectService.updateSubject(
+      await _subjectService.updateSubject(
         widget.disciplina.id!,
         updateData,
       );

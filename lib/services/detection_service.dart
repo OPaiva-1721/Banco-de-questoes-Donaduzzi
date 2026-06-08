@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Serviço para comunicação com a API Python de detecção de gabarito
 class DetectionService {

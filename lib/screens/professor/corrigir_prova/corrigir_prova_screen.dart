@@ -1,16 +1,13 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:camera/camera.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 import 'dart:async';
-import 'dart:typed_data';
 
 // Import condicional para Platform e File (não disponível na web)
 import 'dart:io' if (dart.library.html) 'dart:html' as io;
 import 'package:prova/models/exam_model.dart';
-import 'package:prova/models/question_model.dart';
 import 'package:prova/services/exam_service.dart';
 import 'package:prova/services/question_service.dart';
 import 'package:prova/services/gemini_service.dart';
@@ -121,23 +118,21 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
       for (var link in prova.questions) {
         try {
           final questao = await _questionService.getQuestion(link.questionId);
-          if (questao != null) {
-            totalQuestoes++;
-            final numeroQuestao = link.order;
-            // Encontrar a alternativa correta
-            String? respostaCorreta;
-            for (var option in questao.options) {
-              if (option.isCorrect) {
-                respostaCorreta = option.letter.toUpperCase();
-                break;
-              }
+          totalQuestoes++;
+          final numeroQuestao = link.order;
+          // Encontrar a alternativa correta
+          String? respostaCorreta;
+          for (var option in questao.options) {
+            if (option.isCorrect) {
+              respostaCorreta = option.letter.toUpperCase();
+              break;
             }
-            
-            if (respostaCorreta != null) {
-              gabarito[numeroQuestao] = respostaCorreta;
-            } else {
-              if (kDebugMode) debugPrint('Aviso: Questão $numeroQuestao não tem alternativa correta marcada.');
-            }
+          }
+
+          if (respostaCorreta != null) {
+            gabarito[numeroQuestao] = respostaCorreta;
+          } else {
+            if (kDebugMode) debugPrint('Aviso: Questão $numeroQuestao não tem alternativa correta marcada.');
           }
         } catch (e) {
           if (kDebugMode) debugPrint('Erro ao carregar questão ${link.questionId}: $e');
@@ -297,10 +292,8 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
       for (var link in _provaSelecionada!.questions) {
         try {
           final questao = await _questionService.getQuestion(link.questionId);
-          if (questao != null) {
-            for (var option in questao.options) {
-              alternativasSet.add(option.letter.toUpperCase());
-            }
+          for (var option in questao.options) {
+            alternativasSet.add(option.letter.toUpperCase());
           }
       } catch (e) {
           if (kDebugMode) debugPrint('Erro ao buscar questão ${link.questionId} para alternativas: $e');
@@ -453,8 +446,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     return respostas;
   }
 
-  /// Detecta círculos preenchidos na imagem do gabarito
-  /// Agora detecta automaticamente a estrutura da tabela através das linhas
+  // ignore: unused_element
   Future<Map<int, String>> _detectarCirculosPreenchidos(img.Image image) async {
     final Map<int, String> respostas = {};
     
@@ -1008,7 +1000,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     return respostas;
   }
 
-  // Manter o método antigo como fallback
+  // ignore: unused_element
   Map<int, String> _detectarCirculosAlternativo(img.Image image) {
     return _detectarCirculosAlternativoMelhorado(image);
   }
@@ -1045,6 +1037,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     return totalDarkness / pixelCount;
   }
 
+  // ignore: unused_element
   Map<int, String> _combinarRespostasOCR_e_Circulos(
     String textoOCR,
     Map<int, String> respostasCirculos,

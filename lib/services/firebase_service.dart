@@ -6,8 +6,6 @@ import 'question_service.dart';
 import 'exam_service.dart';
 import 'subject_service.dart';
 import 'course_service.dart';
-import 'content_service.dart';
-import 'security_service.dart';
 import '../models/question_model.dart'; // Importa os modelos
 // Removido: import '../models/app_user_model.dart'; // Não precisa mais aqui
 
@@ -17,11 +15,9 @@ import '../models/question_model.dart'; // Importa os modelos
 /// specialized services. (Correct version using FirebaseAuth)
 class FirebaseService {
   // Instances of specialized services
-  final SecurityService _securityService = SecurityService();
   final UserService _userService = UserService(); // Cria o UserService
   final CourseService _courseService = CourseService();
   final SubjectService _subjectService = SubjectService();
-  final ContentService _contentService = ContentService();
   final QuestionService _questionService = QuestionService();
   final ExamService _examService = ExamService();
 

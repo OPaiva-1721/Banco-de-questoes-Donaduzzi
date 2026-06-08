@@ -8,7 +8,6 @@ import '../../../services/question_service.dart';
 import '../../../services/subject_service.dart';
 import '../../../services/content_service.dart';
 import '../../../utils/message_utils.dart';
-import '../../../core/exceptions/app_exceptions.dart';
 
 class EditarQuestaoScreen extends StatefulWidget {
   final Question questao;

@@ -48,7 +48,7 @@ class _AdicionarCursoScreenState extends State<AdicionarCursoScreen> {
     });
 
     try {
-      final cursoId = await _courseService.createCourse(
+      await _courseService.createCourse(
         _nomeController.text.trim(),
       );
 
