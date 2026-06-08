@@ -44,7 +44,6 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primary,
           primary: AppColors.primary,
-          background: AppColors.background,
           surface: Colors.white,
         ),
         // Estilo global dos Inputs

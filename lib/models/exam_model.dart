@@ -24,8 +24,8 @@ class Exam {
     required this.createdAt,
     List<ExamQuestionLink>? questions,
     List<String>? contentIds,
-  })  : this.questions = questions ?? [],
-        this.contentIds = contentIds ?? [];
+  })  : questions = questions ?? [],
+        contentIds = contentIds ?? [];
 
   String get formattedCreatedAt {
     return DateFormat('dd/MM/yyyy HH:mm').format(createdAt);

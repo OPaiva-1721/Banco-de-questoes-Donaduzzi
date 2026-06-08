@@ -43,7 +43,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
   
   // Agora é uma lista para seleção múltipla de conteúdos
   // Esta lista é de 'String' (não-anulável)
-  List<String> _conteudosSelecionados = [];
+  final List<String> _conteudosSelecionados = [];
 
   // Listas de dados (agora usam models)
   List<Course> _cursos = [];
@@ -202,6 +202,9 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       _isLoading = true;
     });
 
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
       final questoesMaps = dados['questoes'] as List<Map<String, dynamic>>;
 
@@ -243,18 +246,34 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
       }
 
       if (allQuestionsAdded) {
-        MessageUtils.mostrarSucesso(
-          context,
-          'Prova criada com sucesso com ${questoesMaps.length} questões!',
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Prova criada com sucesso com ${questoesMaps.length} questões!',
+            ),
+            backgroundColor: Colors.green[700],
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+          ),
         );
       } else {
-        MessageUtils.mostrarErro(
-          context,
-          'Prova criada, mas algumas questões falharam ao ser adicionadas.',
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Prova criada, mas algumas questões falharam ao ser adicionadas.',
+            ),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+          ),
         );
       }
 
-      Navigator.pop(context, true);
+      navigator.pop(true);
     } catch (e) {
       if (mounted) {
         MessageUtils.mostrarErroFormatado(context, e);
@@ -277,7 +296,7 @@ class _CriarProvaScreenState extends State<CriarProvaScreen> {
         borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             offset: const Offset(0, 4),
             blurRadius: 4,
           ),

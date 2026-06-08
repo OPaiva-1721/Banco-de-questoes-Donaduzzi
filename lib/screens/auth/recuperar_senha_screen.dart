@@ -97,7 +97,7 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -228,9 +228,9 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withOpacity(0.1),
+                    color: AppColors.info.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                    border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,10 +277,10 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.1),
+                    color: AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppColors.success.withOpacity(0.3),
+                      color: AppColors.success.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Column(
@@ -312,7 +312,7 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.05),
+                          color: AppColors.primary.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -353,10 +353,10 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppColors.warning.withOpacity(0.1),
+                                color: AppColors.warning.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: AppColors.warning.withOpacity(0.3),
+                                  color: AppColors.warning.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(

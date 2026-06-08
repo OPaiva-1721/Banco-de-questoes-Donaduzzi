@@ -3,7 +3,6 @@ import '/models/exam_model.dart';
 import '/models/question_model.dart';
 import '/services/question_service.dart';
 import '/models/exam_question_link_model.dart';
-import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -237,11 +236,7 @@ class PdfService {
             ),
             columnWidths: {
               0: const pw.FlexColumnWidth(1.5),
-              ...Map.fromIterable(
-                List.generate(letrasOrdenadas.length, (i) => i + 1),
-                key: (i) => i,
-                value: (_) => const pw.FlexColumnWidth(1),
-              ),
+              ...{ for (var i in List.generate(letrasOrdenadas.length, (i) => i + 1)) i : const pw.FlexColumnWidth(1) },
             },
             children: [
               pw.TableRow(

@@ -241,7 +241,7 @@ class _EditarQuestaoScreenState extends State<EditarQuestaoScreen> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -282,7 +282,7 @@ class _EditarQuestaoScreenState extends State<EditarQuestaoScreen> {
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
-                          value: _disciplinaSelecionada,
+                          initialValue: _disciplinaSelecionada,
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
@@ -324,7 +324,7 @@ class _EditarQuestaoScreenState extends State<EditarQuestaoScreen> {
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
-                          value: _conteudoSelecionado,
+                          initialValue: _conteudoSelecionado,
                           decoration: InputDecoration(
                             hintText: 'Selecione o conteúdo',
                             border: OutlineInputBorder(
@@ -369,7 +369,7 @@ class _EditarQuestaoScreenState extends State<EditarQuestaoScreen> {
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<QuestionDifficulty>(
-                          value: _dificuldadeSelecionada,
+                          initialValue: _dificuldadeSelecionada,
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),

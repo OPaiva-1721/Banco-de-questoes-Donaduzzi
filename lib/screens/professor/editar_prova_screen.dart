@@ -247,6 +247,8 @@ class _EditarProvaScreenState extends State<EditarProvaScreen> {
       _isLoading = true;
     });
 
+    final navigator = Navigator.of(context);
+
     try {
       final questoesMaps = dados['questoes'] as List<Map<String, dynamic>>;
 
@@ -283,7 +285,7 @@ class _EditarProvaScreenState extends State<EditarProvaScreen> {
       _disciplinaOriginalId = _disciplinaSelecionada!;
 
       // Retorna 'true' para a tela anterior (ProvasGeradasScreen)
-      Navigator.pop(context, true);
+      navigator.pop(true);
     } catch (e) {
       if (mounted) {
         MessageUtils.mostrarErroFormatado(context, e);
@@ -307,7 +309,7 @@ class _EditarProvaScreenState extends State<EditarProvaScreen> {
         borderRadius: BorderRadius.circular(AppConstants.defaultBorderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             offset: const Offset(0, 4),
             blurRadius: 4,
           ),

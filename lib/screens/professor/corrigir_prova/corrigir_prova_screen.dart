@@ -1,6 +1,5 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 import 'dart:async';
@@ -341,7 +340,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
           String mensagem = 'Gabarito processado com sucesso! ${respostas.length} resposta(s) identificada(s).';
           
           if (questoesSemResposta > 0) {
-            mensagem += '\n\n⚠️ ${questoesSemResposta} questão(ões) sem resposta válida (múltiplas alternativas marcadas ou sem marcação). Serão consideradas erradas.';
+            mensagem += '\n\n⚠️ $questoesSemResposta questão(ões) sem resposta válida (múltiplas alternativas marcadas ou sem marcação). Serão consideradas erradas.';
           }
           
           MessageUtils.mostrarSucesso(
@@ -372,7 +371,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
         } else if (errorString.contains('permission')) {
           mensagemErro = 'Permissão negada. Verifique as permissões da câmera/galeria.';
         } else {
-          mensagemErro = 'Erro ao processar imagem com Gemini: ${errorString.length > 100 ? errorString.substring(0, 100) + "..." : errorString}';
+          mensagemErro = 'Erro ao processar imagem com Gemini: ${errorString.length > 100 ? '${errorString.substring(0, 100)}...' : errorString}';
         }
         
         MessageUtils.mostrarErro(
@@ -396,7 +395,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     if (kDebugMode) debugPrint('=== PROCESSANDO TEXTO NORMALIZADO ===');
     if (kDebugMode) debugPrint(textoNormalizado);
     
-    final regex1 = RegExp(r'(?:Questão|Q\.?)\s*(\d+)[\s:-\-]*([A-E])', caseSensitive: false);
+    final regex1 = RegExp(r'(?:Questão|Q\.?)\s*(\d+)[\s:\-]*([A-E])', caseSensitive: false);
     final matches1 = regex1.allMatches(textoNormalizado);
     
     for (var match in matches1) {
@@ -465,7 +464,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
     final height = processImage.height;
     
     if (kDebugMode) debugPrint('=== DETECÇÃO DE TABELA E CÍRCULOS ===');
-    if (kDebugMode) debugPrint('Tamanho imagem: ${width}x${height}');
+    if (kDebugMode) debugPrint('Tamanho imagem: ${width}x$height');
     
     final linhasHorizontais = _detectarLinhasHorizontais(processImage);
     if (kDebugMode) debugPrint('Linhas horizontais encontradas: ${linhasHorizontais.length}');
@@ -1038,7 +1037,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
   }
 
   // ignore: unused_element
-  Map<int, String> _combinarRespostasOCR_e_Circulos(
+  Map<int, String> _combinarRespostasOcrECirculos(
     String textoOCR,
     Map<int, String> respostasCirculos,
   ) {
@@ -1137,7 +1136,7 @@ class _CorrigirProvaScreenState extends State<CorrigirProvaScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<Exam>(
-              value: _provaSelecionada,
+              initialValue: _provaSelecionada,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: 'Prova',
