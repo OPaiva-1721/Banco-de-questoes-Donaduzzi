@@ -254,7 +254,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -302,7 +302,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   DropdownButtonFormField<String?>(
-                                    value: _disciplinaFiltro,
+                                    initialValue: _disciplinaFiltro,
                                     decoration: InputDecoration(
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(10),
@@ -352,7 +352,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   DropdownButtonFormField<String>(
-                                    value: _dificuldadeFiltro,
+                                    initialValue: _dificuldadeFiltro,
                                     decoration: InputDecoration(
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(10),
@@ -410,7 +410,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
                             ),
                             const SizedBox(height: 8),
                             DropdownButtonFormField<String?>(
-                              value: _conteudoFiltro,
+                              initialValue: _conteudoFiltro,
                               decoration: InputDecoration(
                                 hintText: _disciplinaFiltro == null
                                     ? 'Selecione uma disciplina primeiro'
@@ -573,7 +573,7 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
                                             decoration: BoxDecoration(
                                               color: _getDificuldadeColor(
                                                 questao.difficulty.name,
-                                              ).withOpacity(0.1),
+                                              ).withValues(alpha: 0.1),
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                               border: Border.all(

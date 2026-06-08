@@ -194,7 +194,7 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -234,7 +234,7 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
-                          value: _disciplinaFiltro,
+                          initialValue: _disciplinaFiltro,
                           decoration: InputDecoration(
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),

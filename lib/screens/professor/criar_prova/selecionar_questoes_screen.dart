@@ -728,12 +728,12 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: questaoColor.withOpacity(0.2),
+                      color: questaoColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: questaoColor, width: 1),
                     ),
                     child: Text(
-                      '${totalSelecionadas} / $_limiteQuestoes',
+                      '$totalSelecionadas / $_limiteQuestoes',
                       style: TextStyle(
                         color: questaoColor, 
                         fontWeight: FontWeight.bold,
@@ -746,7 +746,7 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: pesoColor.withOpacity(0.2),
+                      color: pesoColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: pesoColor, width: 1),
                     ),
@@ -783,7 +783,7 @@ class _SelecionarQuestoesScreenState extends State<SelecionarQuestoesScreen> {
               color: _whiteColor,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 2,
                   offset: const Offset(0, 2),
                 )

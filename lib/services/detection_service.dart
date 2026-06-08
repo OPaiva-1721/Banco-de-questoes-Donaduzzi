@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -69,9 +69,9 @@ class DetectionService {
             }
           });
           
-          print('✓ API detectou ${respostas.length} respostas');
+          if (kDebugMode) debugPrint('✓ API detectou ${respostas.length} respostas');
           if (jsonResponse['debug_info'] != null) {
-            print('Debug: ${jsonResponse['debug_info']}');
+            if (kDebugMode) debugPrint('Debug: ${jsonResponse['debug_info']}');
           }
           
           return respostas;
@@ -86,7 +86,7 @@ class DetectionService {
         );
       }
     } catch (e) {
-      print('Erro ao chamar API de detecção: $e');
+      if (kDebugMode) debugPrint('Erro ao chamar API de detecção: $e');
       rethrow;
     }
   }
@@ -101,7 +101,7 @@ class DetectionService {
       
       return response.statusCode == 200;
     } catch (e) {
-      print('API não disponível: $e');
+      if (kDebugMode) debugPrint('API não disponível: $e');
       return false;
     }
   }

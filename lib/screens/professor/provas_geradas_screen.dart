@@ -59,7 +59,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
   String? _filtroDisciplinaId;
   final TextEditingController _autorController = TextEditingController();
   final TextEditingController _numQuestoesController = TextEditingController();
-  List<String> _filtroConteudosSelecionados = []; // Filtro de multi-seleção
+  final List<String> _filtroConteudosSelecionados = []; // Filtro de multi-seleção
 
   @override
   void initState() {
@@ -437,7 +437,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                   children: [
                     // Filtro Curso
                     DropdownButtonFormField<String?>(
-                      value: _filtroCursoId,
+                      initialValue: _filtroCursoId,
                       isExpanded: true,
                       hint: const Text('Filtrar por Curso'),
                       decoration: const InputDecoration(
@@ -459,7 +459,7 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
 
                     // Filtro Disciplina
                     DropdownButtonFormField<String?>(
-                      value: _filtroDisciplinaId,
+                      initialValue: _filtroDisciplinaId,
                       isExpanded: true,
                       hint: const Text('Filtrar por Disciplina'),
                       decoration: const InputDecoration(
@@ -504,6 +504,9 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                                 style: TextStyle(color: Colors.grey),
                               )
                             : null,
+                        onExpansionChanged: _filtroDisciplinaId == null
+                            ? (_) {}
+                            : null,
                         children: conteudosParaFiltro.isEmpty
                             ? [
                                 const Padding(
@@ -540,9 +543,6 @@ class _ProvasGeradasScreenState extends State<ProvasGeradasScreen> {
                                   },
                                 );
                               }).toList(),
-                        onExpansionChanged: _filtroDisciplinaId == null
-                            ? (_) {}
-                            : null,
                       ),
                     ),
                     const SizedBox(height: 12),

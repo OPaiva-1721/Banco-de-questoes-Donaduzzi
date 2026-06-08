@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../../utils/message_utils.dart';
 import '../../services/firebase_service.dart';
 import '../../core/app_colors.dart'; // Mantido da sua branch visual
 import '../../services/permission_service.dart'; // Mantido da main
@@ -188,18 +187,28 @@ class _TelaInicioState extends State<TelaInicio> {
   }
 
   Future<void> _fazerLogout(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await _firebaseService.signOut();
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
+        navigator.pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const TelaLogin()),
           (route) => false,
         );
       }
     } catch (e) {
       if (mounted) {
-        MessageUtils.mostrarErroFormatado(context, e);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red[700],
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+          ),
+        );
       }
     }
   }
@@ -234,7 +243,7 @@ class _DashboardCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 32, color: color),

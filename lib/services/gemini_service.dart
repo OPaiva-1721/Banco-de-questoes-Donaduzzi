@@ -1,5 +1,4 @@
-﻿import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
@@ -47,7 +46,7 @@ class GeminiService {
 
   /// Detecta respostas marcadas em uma imagem de gabarito
   /// 
-  /// Retorna um Map<int, String> onde:
+  /// Retorna um `Map<int, String>` onde:
   /// - Key: número da questão (1, 2, 3, ...)
   /// - Value: letra da alternativa marcada (A, B, C, D, E)
   Future<Map<int, String>> detectarRespostas({
@@ -167,7 +166,7 @@ IMPORTANTE:
         invalidasMap.forEach((key, value) {
           if (value is List) {
             final alternativas = (value).map((e) => e.toString()).join(', ');
-            questoesInvalidas.add('Questão $key: ${alternativas}');
+            questoesInvalidas.add('Questão $key: $alternativas');
           } else {
             questoesInvalidas.add('Questão $key: múltiplas respostas');
           }
