@@ -59,7 +59,7 @@ class _EditarConteudoScreenState extends State<EditarConteudoScreen> {
     try {
       final updateData = {'description': _descricaoController.text.trim()};
 
-      final sucesso = await _contentService.updateContent(
+      await _contentService.updateContent(
         widget.conteudo.id!,
         updateData,
       );

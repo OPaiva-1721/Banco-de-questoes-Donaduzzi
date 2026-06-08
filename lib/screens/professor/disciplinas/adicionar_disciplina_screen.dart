@@ -50,7 +50,7 @@ class _AdicionarDisciplinaScreenState extends State<AdicionarDisciplinaScreen> {
     });
 
     try {
-      final disciplinaId = await _subjectService.createSubject(
+      await _subjectService.createSubject(
         _nomeController.text.trim(),
         _semestreSelecionado,
       );

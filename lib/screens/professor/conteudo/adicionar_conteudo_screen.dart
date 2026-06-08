@@ -51,7 +51,7 @@ class _AdicionarConteudoScreenState extends State<AdicionarConteudoScreen> {
     });
 
     try {
-      final conteudoId = await _contentService.createContent(
+      await _contentService.createContent(
         description: _descricaoController.text.trim(),
         subjectId: widget.disciplinaId,
       );

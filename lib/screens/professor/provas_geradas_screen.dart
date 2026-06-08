@@ -9,7 +9,6 @@ import 'package:prova/services/pdf_service.dart';
 import 'package:prova/models/exam_model.dart';
 import 'package:prova/utils/message_utils.dart';
 import 'package:prova/core/app_colors.dart';
-import 'package:prova/core/exceptions/app_exceptions.dart';
 import 'package:prova/services/course_service.dart';
 import 'package:prova/models/course_model.dart';
 import 'package:prova/services/subject_service.dart';

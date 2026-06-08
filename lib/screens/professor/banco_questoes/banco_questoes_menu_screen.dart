@@ -6,7 +6,6 @@ import '../../../services/question_service.dart';
 import '../../../services/subject_service.dart';
 import '../../../services/content_service.dart';
 import '../../../utils/message_utils.dart';
-import '../../../core/exceptions/app_exceptions.dart';
 import 'adicionar_questao_screen.dart';
 import 'editar_questao_screen.dart';
 
@@ -153,15 +152,6 @@ class _GerenciarQuestoesScreenState extends State<GerenciarQuestoesScreen> {
       orElse: () => Discipline(name: 'Desconhecida', semester: 0),
     );
     return disciplina.name;
-  }
-
-  String _getNomeConteudo(String? conteudoId) {
-    if (conteudoId == null) return 'Desconhecido';
-    final conteudo = _conteudos.firstWhere(
-      (c) => c.id == conteudoId,
-      orElse: () => Content(description: 'Desconhecido', subjectId: ''),
-    );
-    return conteudo.description;
   }
 
   String _getDificuldadeLabel(String difficulty) {

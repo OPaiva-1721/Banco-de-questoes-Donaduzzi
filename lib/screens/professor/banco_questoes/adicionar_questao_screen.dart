@@ -8,7 +8,6 @@ import '../../../models/content_model.dart';
 import '../../../services/question_service.dart';
 import '../../../services/subject_service.dart';
 import '../../../services/content_service.dart';
-import '../../../core/exceptions/app_exceptions.dart';
 import '../../../utils/message_utils.dart';
 
 class AdicionarQuestaoScreen extends StatefulWidget {
@@ -201,7 +200,7 @@ class _AdicionarQuestaoScreenState extends State<AdicionarQuestaoScreen> {
             : _explicacaoController.text.trim(),
       );
 
-      final questaoId = await _questionService.createQuestion(novaQuestao);
+      await _questionService.createQuestion(novaQuestao);
 
       if (mounted) {
         MessageUtils.mostrarSucesso(context, 'Questão criada com sucesso!');

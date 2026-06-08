@@ -57,7 +57,7 @@ class _EditarCursoScreenState extends State<EditarCursoScreen> {
     try {
       final updateData = {'name': _nomeController.text.trim()};
 
-      final sucesso = await _courseService.updateCourse(
+      await _courseService.updateCourse(
         widget.curso.id!,
         updateData,
       );
