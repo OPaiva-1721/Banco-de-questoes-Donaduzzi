@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../core/app_colors.dart';
 import '../../../services/course_service.dart';
 import '../../../utils/message_utils.dart';
+import '../../../widgets/app_card.dart';
+import '../../../widgets/app_save_button.dart';
+import '../../../widgets/form_field_section.dart';
 
 class AdicionarCursoScreen extends StatefulWidget {
   const AdicionarCursoScreen({super.key});
@@ -10,13 +14,7 @@ class AdicionarCursoScreen extends StatefulWidget {
 }
 
 class _AdicionarCursoScreenState extends State<AdicionarCursoScreen> {
-  static const Color _primaryColor = Color(0xFF541822);
-  static const Color _backgroundColor = Color(0xFFF5F5F5);
-  static const Color _textColor = Color(0xFF333333);
-  static const Color _whiteColor = Colors.white;
-
   final CourseService _courseService = CourseService();
-
   late final TextEditingController _nomeController;
   bool _isLoading = false;
 
@@ -42,122 +40,51 @@ class _AdicionarCursoScreenState extends State<AdicionarCursoScreen> {
 
   Future<void> _salvarCurso() async {
     if (!_validarFormulario()) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      await _courseService.createCourse(
-        _nomeController.text.trim(),
-      );
-
+      await _courseService.createCourse(_nomeController.text.trim());
       if (mounted) {
         MessageUtils.mostrarSucesso(context, 'Curso criado com sucesso!');
         Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) {
-        MessageUtils.mostrarErroFormatado(context, e);
-      }
+      if (mounted) MessageUtils.mostrarErroFormatado(context, e);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Widget _buildContainer({required Widget child, double? height}) {
-    return Container(
-      width: double.infinity,
-      height: height,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _whiteColor,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Novo Curso'),
-        backgroundColor: _primaryColor,
+        backgroundColor: AppColors.primary,
         elevation: 0,
-        foregroundColor: _whiteColor,
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildContainer(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Nome do Curso',
-                    style: TextStyle(
-                      color: _textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+            AppCard(
+              child: FormFieldSection(
+                label: 'Nome do Curso',
+                field: TextField(
+                  controller: _nomeController,
+                  decoration: const InputDecoration(
+                    hintText: 'Ex: Engenharia de Software, Medicina, etc.',
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _nomeController,
-                    decoration: InputDecoration(
-                      hintText: 'Ex: Engenharia de Software, Medicina, etc.',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[100],
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
             const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _salvarCurso,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primaryColor,
-                foregroundColor: _whiteColor,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(_whiteColor),
-                      ),
-                    )
-                  : const Text(
-                      'Salvar Curso',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+            AppSaveButton(
+              label: 'Salvar Curso',
+              isLoading: _isLoading,
+              onPressed: _salvarCurso,
             ),
           ],
         ),

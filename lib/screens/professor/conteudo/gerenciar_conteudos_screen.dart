@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../../core/app_colors.dart';
 import '../../../models/content_model.dart';
 import '../../../models/discipline_model.dart';
 import '../../../services/content_service.dart';
 import '../../../services/subject_service.dart';
 import '../../../utils/message_utils.dart';
+import '../../../widgets/app_card.dart';
+import '../../../widgets/confirm_delete_dialog.dart';
+import '../../../widgets/empty_state_widget.dart';
+import '../../../widgets/form_field_section.dart';
 import 'adicionar_conteudo_screen.dart';
 import 'editar_conteudo_screen.dart';
 
@@ -16,11 +21,6 @@ class GerenciarConteudosScreen extends StatefulWidget {
 }
 
 class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
-  static const Color _primaryColor = Color(0xFF541822);
-  static const Color _backgroundColor = Color(0xFFF5F5F5);
-  static const Color _textColor = Color(0xFF333333);
-  static const Color _whiteColor = Colors.white;
-
   final ContentService _contentService = ContentService();
   final SubjectService _subjectService = SubjectService();
 
@@ -36,32 +36,20 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
   }
 
   Future<void> _carregarDados() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       await _carregarDisciplinas();
-      if (_disciplinaFiltro != null) {
-        await _carregarConteudos();
-      }
+      if (_disciplinaFiltro != null) await _carregarConteudos();
     } catch (e) {
-      if (mounted) {
-        MessageUtils.mostrarErroFormatado(context, e);
-      }
+      if (mounted) MessageUtils.mostrarErroFormatado(context, e);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _carregarDisciplinas() async {
     try {
       final event = await _subjectService.listarDisciplinas().first;
-
       if (event.snapshot.exists && event.snapshot.value != null) {
         final disciplinas = <Discipline>[];
         for (final child in event.snapshot.children) {
@@ -77,68 +65,33 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
         }
       }
     } catch (e) {
-      if (mounted) {
-        MessageUtils.mostrarErroFormatado(context, e);
-      }
+      if (mounted) MessageUtils.mostrarErroFormatado(context, e);
     }
   }
 
   Future<void> _carregarConteudos() async {
     if (_disciplinaFiltro == null) return;
-
     try {
       final conteudos = await _contentService
           .getContentBySubjectStream(_disciplinaFiltro!)
           .first;
-
-      if (mounted) {
-        setState(() {
-          _conteudos = conteudos;
-        });
-      }
+      if (mounted) setState(() => _conteudos = conteudos);
     } catch (e) {
-      if (mounted) {
-        MessageUtils.mostrarErroFormatado(context, e);
-      }
+      if (mounted) MessageUtils.mostrarErroFormatado(context, e);
     }
   }
 
   Future<void> _deletarConteudo(Content conteudo) async {
-    final confirmacao = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar exclusão'),
-        content: Text(
-          'Tem certeza que deseja APAGAR o conteúdo:\n"${conteudo.description}"?\n\nEsta ação não pode ser desfeita.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Apagar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmacao == true && conteudo.id != null) {
+    final confirmado = await showConfirmDeleteDialog(context, itemName: conteudo.description);
+    if (confirmado && conteudo.id != null) {
       try {
         await _contentService.deleteContent(conteudo.id!);
         if (mounted) {
-          MessageUtils.mostrarSucesso(
-            context,
-            'Conteúdo apagado com sucesso!',
-          );
+          MessageUtils.mostrarSucesso(context, 'Conteúdo apagado com sucesso!');
           await _carregarConteudos();
         }
       } catch (e) {
-        if (mounted) {
-          MessageUtils.mostrarErroFormatado(context, e);
-        }
+        if (mounted) MessageUtils.mostrarErroFormatado(context, e);
       }
     }
   }
@@ -148,7 +101,6 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
       MessageUtils.mostrarErro(context, 'Selecione uma disciplina primeiro');
       return;
     }
-
     final resultado = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -156,10 +108,7 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
             AdicionarConteudoScreen(disciplinaId: _disciplinaFiltro!),
       ),
     );
-
-    if (resultado == true) {
-      await _carregarConteudos();
-    }
+    if (resultado == true) await _carregarConteudos();
   }
 
   Future<void> _navegarParaEditar(Content conteudo) async {
@@ -169,10 +118,7 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
         builder: (context) => EditarConteudoScreen(conteudo: conteudo),
       ),
     );
-
-    if (resultado == true) {
-      await _carregarConteudos();
-    }
+    if (resultado == true) await _carregarConteudos();
   }
 
   String _getNomeDisciplina(String? disciplinaId) {
@@ -184,35 +130,15 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
     return disciplina.name;
   }
 
-  Widget _buildContainer({required Widget child, double? height}) {
-    return Container(
-      width: double.infinity,
-      height: height,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _whiteColor,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Gerenciar Conteúdos'),
-        backgroundColor: _primaryColor,
+        backgroundColor: AppColors.primary,
         elevation: 0,
-        foregroundColor: _whiteColor,
+        foregroundColor: Colors.white,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -220,72 +146,46 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _buildContainer(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Filtrar por Disciplina',
-                          style: TextStyle(
-                            color: _textColor,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField<String>(
-                          initialValue: _disciplinaFiltro,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                          items: _disciplinas.map((disciplina) {
-                            return DropdownMenuItem(
-                              value: disciplina.id,
-                              child: Text(disciplina.name),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            setState(() {
-                              _disciplinaFiltro = value;
-                            });
-                            _carregarConteudos();
-                          },
-                        ),
-                      ],
+                  AppCard(
+                    child: FormFieldSection(
+                      label: 'Filtrar por Disciplina',
+                      field: DropdownButtonFormField<String>(
+                        initialValue: _disciplinaFiltro,
+                        decoration: const InputDecoration(),
+                        items: _disciplinas.map((disciplina) {
+                          return DropdownMenuItem(
+                            value: disciplina.id,
+                            child: Text(disciplina.name),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() => _disciplinaFiltro = value);
+                          _carregarConteudos();
+                        },
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  _buildContainer(
+                  const SizedBox(height: 16),
+                  AppCard(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Total: ${_conteudos.length} conteúdo(s)',
-                          style: TextStyle(
-                            color: _textColor,
+                          '${_conteudos.length} conteúdo(s)',
+                          style: const TextStyle(
+                            color: AppColors.text,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         ElevatedButton.icon(
                           onPressed: _navegarParaAdicionar,
-                          icon: const Icon(Icons.add),
+                          icon: const Icon(Icons.add, size: 18),
                           label: const Text('Novo Conteúdo'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _primaryColor,
-                            foregroundColor: _whiteColor,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -297,84 +197,66 @@ class _GerenciarConteudosScreenState extends State<GerenciarConteudosScreen> {
                   const SizedBox(height: 20),
                   Expanded(
                     child: _conteudos.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.library_books_outlined,
-                                  size: 80,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Nenhum conteúdo cadastrado',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                TextButton.icon(
-                                  onPressed: _navegarParaAdicionar,
-                                  icon: const Icon(Icons.add),
-                                  label: const Text(
-                                    'Adicionar primeiro conteúdo',
-                                  ),
-                                ),
-                              ],
-                            ),
+                        ? EmptyStateWidget(
+                            icon: Icons.library_books_outlined,
+                            message: 'Nenhum conteúdo cadastrado',
+                            actionLabel: 'Adicionar primeiro conteúdo',
+                            onAction: _navegarParaAdicionar,
                           )
                         : ListView.builder(
                             itemCount: _conteudos.length,
                             itemBuilder: (context, index) {
                               final conteudo = _conteudos[index];
                               return Padding(
-                                padding: const EdgeInsets.only(bottom: 15),
-                                child: _buildContainer(
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              conteudo.description,
-                                              style: TextStyle(
-                                                color: _textColor,
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              'Disciplina: ${_getNomeDisciplina(conteudo.subjectId)}',
-                                              style: TextStyle(
-                                                color: Colors.grey[600],
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: AppCard(
+                                  padding: EdgeInsets.zero,
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 6,
+                                    ),
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withValues(alpha: 0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.article_outlined,
+                                        color: AppColors.primary,
+                                        size: 22,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      conteudo.description,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                        color: AppColors.text,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      _getNomeDisciplina(conteudo.subjectId),
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit),
+                                          color: AppColors.primary,
+                                          onPressed: () => _navegarParaEditar(conteudo),
                                         ),
-                                      ),
-                                      Row(
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.edit),
-                                            color: _primaryColor,
-                                            onPressed: () =>
-                                                _navegarParaEditar(conteudo),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.delete),
-                                            color: Colors.red,
-                                            onPressed: () =>
-                                                _deletarConteudo(conteudo),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                        IconButton(
+                                          icon: const Icon(Icons.delete),
+                                          color: Colors.red,
+                                          onPressed: () => _deletarConteudo(conteudo),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
